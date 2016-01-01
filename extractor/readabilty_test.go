@@ -31,6 +31,7 @@ func TestExtactGeneral(t *testing.T) {
 	assert.Equal(t, "Всем миром для общей пользы", a.Title)
 	assert.Equal(t, "http://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", a.URL)
 	assert.Equal(t, "5 Дек. 2015: новая версия уже тут! Спасибо всем неравнодушным, и конечно Игорю Адаменко, который придумал и реализовал весь этот UI. Всем, у кого остались замечательные идеи, рекомендую ...", a.Excerpt)
+	assert.Equal(t, "p.umputun.com", a.Domain)
 
 	a, err = lr.Extract("http://goo.gl/v48b6Q")
 	assert.Nil(t, err)
@@ -38,6 +39,8 @@ func TestExtactGeneral(t *testing.T) {
 	assert.Equal(t, "http://podcast.umputun.com/p/2015/11/22/podcast-369/", a.URL)
 	assert.Equal(t, "UWP - Выпуск 369 22-11-2015 | Comments Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по ...", a.Excerpt)
 	assert.Equal(t, "http://podcast.umputun.com/images/uwp/uwp369.jpg", a.Image)
+	assert.Equal(t, "podcast.umputun.com", a.Domain)
+
 }
 
 func TestMainPic(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -13,12 +14,13 @@ import (
 	"umputun.com/ureadability/sanitize"
 )
 
-//Readability implements fetcher interface for local readbility-like functionality
+//Readability implements fetcher & exrtactor for local readbility-like functionality
 type Readability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 }
 
+//Response from api calls
 type Response struct {
 	Content, Rich string
 	Domain        string
@@ -28,12 +30,12 @@ type Response struct {
 	Image         string
 }
 
-func (f Readability) Extract(url string) (rb *Response, err error) {
+func (f Readability) Extract(reqUrl string) (rb *Response, err error) {
 	rb = &Response{}
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
-	resp, err := httpClient.Get(url)
+	resp, err := httpClient.Get(reqUrl)
 	if err != nil {
-		log.Printf("failed to get anyting from %s, error=%v", url, err)
+		log.Printf("failed to get anyting from %s, error=%v", reqUrl, err)
 		return nil, err
 	}
 
@@ -41,14 +43,14 @@ func (f Readability) Extract(url string) (rb *Response, err error) {
 	dataBytes, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		log.Printf("failed to read data from %s, error=%v", url, err)
+		log.Printf("failed to read data from %s, error=%v", reqUrl, err)
 		return nil, err
 	}
 
 	body := string(dataBytes)
 	doc, err := readability.NewDocument(body)
 	if err != nil {
-		log.Printf("failed to parse %s, error=%v", url, err)
+		log.Printf("failed to parse %s, error=%v", reqUrl, err)
 		return nil, err
 	}
 	dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
@@ -58,11 +60,15 @@ func (f Readability) Extract(url string) (rb *Response, err error) {
 
 	rb.Title = dbody.Find("title").Text()
 
+	if r, err := url.Parse(rb.URL); err == nil {
+		rb.Domain = r.Host
+	}
+
 	rb.Content, rb.Rich = doc.Content()
 	rb.Rich = normalizeLinks(rb.Rich, resp.Request)
 	rb.Excerpt = f.getSnippet(rb.Content, rb.Title)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
-	if im, ok := getMainPic(darticle.Find("img"), url); ok {
+	if im, ok := getMainPic(darticle.Find("img"), reqUrl); ok {
 		rb.Image = im
 	}
 
