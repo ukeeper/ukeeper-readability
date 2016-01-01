@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,13 +23,12 @@ type UReadability struct {
 
 //Response from api calls
 type Response struct {
-	Content string `json:"content"`
-	Rich    string `json:"rich_content"`
-	Domain  string `json:"domain"`
-	URL     string `json:"url"`
-	Title   string `json:"title"`
-	Excerpt string `json:"excerpt"`
-	Image   string `json:"lead_image_url"`
+	Content, Rich string
+	Domain        string
+	URL           string
+	Title         string
+	Excerpt       string
+	Image         string
 }
 
 var (
@@ -47,10 +47,11 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 		log.Printf("failed to get anyting from %s, error=%v", reqURL, err)
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	rb.URL = resp.Request.URL.String()
 	dataBytes, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
+
 	if err != nil {
 		log.Printf("failed to read data from %s, error=%v", reqURL, err)
 		return nil, err
@@ -121,28 +122,27 @@ func (f UReadability) getSnippet(cleanText string) string {
 
 func getMainPic(imgSelect *goquery.Selection, url string) (image string, ok bool) {
 
-	images := make(map[string]int)
+	images := make(map[int]string)
 
 	imgSelect.Each(func(i int, s *goquery.Selection) {
 		if im, ok := s.Attr("src"); ok {
-			images[im] = getImageSize(im)
+			images[getImageSize(im)] = im
 		}
 	})
 
-	//get biggest picture
-	max, r := 0, ""
-	for k, v := range images {
-		if v > max {
-			max, r = v, k
-		}
-	}
-
-	if max == 0 {
+	if len(images) == 0 {
 		return "", false
 	}
 
-	log.Printf("total images from %s = %d, main=%s (%d)", url, len(images), r, max)
-	return r, true
+	//get biggest picture
+	keys := make([]int, 0, len(images))
+	for k := range images {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
+	image = images[keys[0]]
+	log.Printf("total images from %s = %d, main=%s (%d)", url, len(images), image, keys[0])
+	return image, true
 }
 
 func getImageSize(url string) int {
@@ -165,9 +165,9 @@ func getImageSize(url string) int {
 
 func normalizeLinks(data string, reqContext *http.Request) string {
 
-	absoluteLink := func(link string) (string, bool) {
+	absoluteLink := func(link string) (absLink string, chnaged bool) {
 		if r, err := reqContext.URL.Parse(link); err == nil {
-			return r.String(), true
+			return r.String(), r.String() != link
 		}
 		return "", false
 	}
