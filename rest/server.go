@@ -25,6 +25,7 @@ func (r Server) Run() {
 
 	router, err := rest.MakeRouter(
 		rest.Post("/api/v1/extract", r.extractArticle),
+		rest.Get("/api/content/v1/parser", r.extractArticleEmulateReadability),
 	)
 
 	if err != nil {
@@ -49,4 +50,25 @@ func (r Server) extractArticle(w rest.ResponseWriter, req *rest.Request) {
 		return
 	}
 	w.WriteJson(res)
+}
+
+//emulate radability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
+func (r Server) extractArticleEmulateReadability(w rest.ResponseWriter, req *rest.Request) {
+	token := req.URL.Query().Get("token")
+	if token == "" {
+		rest.Error(w, "no token passed", http.StatusExpectationFailed)
+		return
+	}
+	url := req.URL.Query().Get("url")
+	if url == "" {
+		rest.Error(w, "no url passed", http.StatusExpectationFailed)
+		return
+	}
+	res, err := r.Readability.Extract(url)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteJson(res)
+
 }
