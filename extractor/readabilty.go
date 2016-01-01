@@ -30,8 +30,15 @@ type Response struct {
 	Image         string
 }
 
+var (
+	reLinks  = regexp.MustCompile(`(href|src|action|background)="([^"]*)"`)
+	reSpaces = regexp.MustCompile(`\s+`)
+	reDot    = regexp.MustCompile(`\D(\.)\S`)
+)
+
 //Extract fetches page and retrive article
 func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
+	log.Printf("extract %s", reqURL)
 	rb = &Response{}
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
 	resp, err := httpClient.Get(reqURL)
@@ -74,6 +81,7 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 		rb.Image = im
 	}
 
+	log.Printf("completed for %s, url=%s", rb.Title, rb.URL)
 	return rb, nil
 }
 
@@ -84,11 +92,8 @@ func (f UReadability) getText(content string, title string) string {
 	cleanText = strings.TrimSpace(cleanText)
 
 	//replace multiple spaces by one space
-	re := regexp.MustCompile(`\s+`)
-	cleanText = re.ReplaceAllString(cleanText, " ")
-
-	re = regexp.MustCompile(`\D(\.)\S`)
-	matches := re.FindAllStringSubmatch(cleanText, -1)
+	cleanText = reSpaces.ReplaceAllString(cleanText, " ")
+	matches := reDot.FindAllStringSubmatch(cleanText, -1)
 	for _, m := range matches {
 		src := m[0]
 		dst := strings.Replace(src, ".", ". ", 1)
@@ -167,15 +172,13 @@ func normalizeLinks(data string, reqContext *http.Request) string {
 	}
 
 	result := data
-	re := regexp.MustCompile(`(href|src|action|background)="([^"]*)"`)
-	matches := re.FindAllStringSubmatch(data, -1)
+	matches := reLinks.FindAllStringSubmatch(data, -1)
 	normalizedCount := 0
 	for _, m := range matches {
 		srcLink := m[len(m)-1] //link in last element of the group
 		if dstLink, changed := absoluteLink(m[len(m)-1]); changed {
 			result = strings.Replace(result, srcLink, dstLink, -1)
 			normalizedCount++
-			// log.Printf("normalize %s -> %s", srcLink, dstLink)
 		}
 
 	}
