@@ -1,6 +1,7 @@
 package extractor
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -179,7 +180,10 @@ func normalizeLinks(data string, reqContext *http.Request) string {
 	for _, m := range matches {
 		srcLink := m[len(m)-1] //link in last element of the group
 		if dstLink, changed := absoluteLink(srcLink); changed {
+			srcLink := fmt.Sprintf(`"%s"`, srcLink)
+			dstLink := fmt.Sprintf(`"%s"`, dstLink)
 			result = strings.Replace(result, srcLink, dstLink, -1)
+			log.Printf("%s -> %s", srcLink, dstLink)
 			normalizedCount++
 		}
 

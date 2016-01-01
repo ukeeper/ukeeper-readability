@@ -57,3 +57,9 @@ func TestNormilizeLinks(t *testing.T) {
 	out := normalizeLinks(inp, &http.Request{URL: u})
 	assert.Equal(t, `blah <img src="http://umputun.com/aaa.png"/> sdfasd <a href="http://umputun.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
 }
+
+func TestNormilizeLinksIssue(t *testing.T) {
+	lr := UReadability{TimeOut: 30, SnippetSize: 200}
+	_, err := lr.Extract("https://git-scm.com/book/en/v2/Git-Tools-Submodules")
+	assert.Nil(t, err)
+}
