@@ -1,4 +1,4 @@
-package fetcher
+package extractor
 
 import (
 	"net/http"
@@ -9,23 +9,23 @@ import (
 )
 
 func TestExtractURL(t *testing.T) {
-	lr := Readability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	t.Log("full url")
 	rb, err := lr.Extract("http://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.Nil(t, err)
 	assert.Equal(t, "http://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "not changed")
 	assert.Equal(t, "Всем миром для общей пользы", rb.Title)
-	assert.Equal(t, 10344, len(rb.Content))
+	assert.Equal(t, 9669, len(rb.Content))
 
 	t.Log("short url")
 	rb, err = lr.Extract("http://goo.gl/IAvTHr")
 	assert.Nil(t, err)
 	assert.Equal(t, "http://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "full url")
-	assert.Equal(t, 10344, len(rb.Content))
+	assert.Equal(t, 9669, len(rb.Content))
 }
 
 func TestExtactGeneral(t *testing.T) {
-	lr := Readability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	a, err := lr.Extract("http://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.Nil(t, err)
 	assert.Equal(t, "Всем миром для общей пользы", a.Title)
@@ -45,7 +45,7 @@ func TestExtactGeneral(t *testing.T) {
 
 func TestMainPic(t *testing.T) {
 	t.Log("test main pic")
-	lr := Readability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	a, err := lr.Extract("http://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
 	assert.Nil(t, err)
 	assert.Equal(t, "http://p.umputun.com/content/images/2015/09/n891a_20150925_023343-minwz.png", a.Image)

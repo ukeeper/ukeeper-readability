@@ -4,6 +4,9 @@ import (
 	"log"
 	"os"
 
+	"umputun.com/ureadability/extractor"
+	"umputun.com/ureadability/rest"
+
 	"github.com/jessevdk/go-flags"
 )
 
@@ -17,6 +20,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	restServer := rest.Server{Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300}}
+	restServer.Run()
 }
 
 func init() {

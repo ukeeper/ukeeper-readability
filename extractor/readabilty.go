@@ -1,4 +1,4 @@
-package fetcher
+package extractor
 
 import (
 	"io/ioutil"
@@ -14,8 +14,8 @@ import (
 	"umputun.com/ureadability/sanitize"
 )
 
-//Readability implements fetcher & exrtactor for local readbility-like functionality
-type Readability struct {
+//UReadability implements fetcher & exrtactor for local readbility-like functionality
+type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 }
@@ -30,12 +30,13 @@ type Response struct {
 	Image         string
 }
 
-func (f Readability) Extract(reqUrl string) (rb *Response, err error) {
+//Extract fetches page and retrive article
+func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	rb = &Response{}
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
-	resp, err := httpClient.Get(reqUrl)
+	resp, err := httpClient.Get(reqURL)
 	if err != nil {
-		log.Printf("failed to get anyting from %s, error=%v", reqUrl, err)
+		log.Printf("failed to get anyting from %s, error=%v", reqURL, err)
 		return nil, err
 	}
 
@@ -43,14 +44,14 @@ func (f Readability) Extract(reqUrl string) (rb *Response, err error) {
 	dataBytes, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		log.Printf("failed to read data from %s, error=%v", reqUrl, err)
+		log.Printf("failed to read data from %s, error=%v", reqURL, err)
 		return nil, err
 	}
 
 	body := string(dataBytes)
 	doc, err := readability.NewDocument(body)
 	if err != nil {
-		log.Printf("failed to parse %s, error=%v", reqUrl, err)
+		log.Printf("failed to parse %s, error=%v", reqURL, err)
 		return nil, err
 	}
 	dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
@@ -65,21 +66,21 @@ func (f Readability) Extract(reqUrl string) (rb *Response, err error) {
 	}
 
 	rb.Content, rb.Rich = doc.Content()
+	rb.Content = f.getText(rb.Content, rb.Title)
 	rb.Rich = normalizeLinks(rb.Rich, resp.Request)
-	rb.Excerpt = f.getSnippet(rb.Content, rb.Title)
+	rb.Excerpt = f.getSnippet(rb.Content)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
-	if im, ok := getMainPic(darticle.Find("img"), reqUrl); ok {
+	if im, ok := getMainPic(darticle.Find("img"), reqURL); ok {
 		rb.Image = im
 	}
 
 	return rb, nil
 }
 
-func (f Readability) getSnippet(content string, title string) string {
+func (f UReadability) getText(content string, title string) string {
 	cleanText := sanitize.HTML(content)
 	cleanText = strings.Replace(cleanText, title, "", 1) //get rid of title in snippet
 	cleanText = strings.Replace(cleanText, "\t", " ", -1)
-	cleanText = strings.Replace(cleanText, "\n", " ", -1)
 	cleanText = strings.TrimSpace(cleanText)
 
 	//replace multiple spaces by one space
@@ -93,7 +94,11 @@ func (f Readability) getSnippet(content string, title string) string {
 		dst := strings.Replace(src, ".", ". ", 1)
 		cleanText = strings.Replace(cleanText, src, dst, 1)
 	}
+	return cleanText
+}
 
+func (f UReadability) getSnippet(cleanText string) string {
+	cleanText = strings.Replace(cleanText, "\n", " ", -1)
 	size := len([]rune(cleanText))
 	if size > f.SnippetSize {
 		size = f.SnippetSize
