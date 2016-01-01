@@ -3,7 +3,6 @@ package rest
 import (
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/ant0ine/go-json-rest/rest"
 	"umputun.com/ureadability/extractor"
@@ -12,8 +11,6 @@ import (
 //Server basic rest server to access msgs from mongo
 type Server struct {
 	Readability extractor.UReadability
-	updLock     *sync.Mutex
-	activeLock  *sync.RWMutex
 }
 
 //Run the lister and request's router, activate rest server
