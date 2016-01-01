@@ -54,12 +54,13 @@ func (r Server) extractArticle(w rest.ResponseWriter, req *rest.Request) {
 
 //emulate radability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 func (r Server) extractArticleEmulateReadability(w rest.ResponseWriter, req *rest.Request) {
-	token := req.URL.Query().Get("token")
+	query := req.URL.Query()
+	token := query.Get("token")
 	if token == "" {
 		rest.Error(w, "no token passed", http.StatusExpectationFailed)
 		return
 	}
-	url := req.URL.Query().Get("url")
+	url := query.Get("url")
 	if url == "" {
 		rest.Error(w, "no url passed", http.StatusExpectationFailed)
 		return
