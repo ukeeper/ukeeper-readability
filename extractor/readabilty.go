@@ -177,7 +177,7 @@ func normalizeLinks(data string, reqContext *http.Request) string {
 	normalizedCount := 0
 	for _, m := range matches {
 		srcLink := m[len(m)-1] //link in last element of the group
-		if dstLink, changed := absoluteLink(m[len(m)-1]); changed {
+		if dstLink, changed := absoluteLink(srcLink); changed {
 			result = strings.Replace(result, srcLink, dstLink, -1)
 			normalizedCount++
 		}
