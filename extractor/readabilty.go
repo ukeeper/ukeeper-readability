@@ -23,12 +23,13 @@ type UReadability struct {
 
 //Response from api calls
 type Response struct {
-	Content, Rich string
-	Domain        string
-	URL           string
-	Title         string
-	Excerpt       string
-	Image         string
+	Content string `json:"content"`
+	Rich    string `json:"rich_content"`
+	Domain  string `json:"domain"`
+	URL     string `json:"url"`
+	Title   string `json:"title"`
+	Excerpt string `json:"excerpt"`
+	Image   string `json:"lead_image_url"`
 }
 
 var (
