@@ -7,7 +7,6 @@ build_app:
     script:
         - export GO15VENDOREXPERIMENT=1
         - mkdir -p /go/src/umputun.com
-        - ln -s /builds/umputun.com/ureadability /go/src/umputun.com/ureadability
         - cd /go/src/umputun.com/ureadability
         - go get -v
         - go get -t ./...
