@@ -183,7 +183,7 @@ func normalizeLinks(data string, reqContext *http.Request) string {
 			srcLink := fmt.Sprintf(`"%s"`, srcLink)
 			dstLink := fmt.Sprintf(`"%s"`, dstLink)
 			result = strings.Replace(result, srcLink, dstLink, -1)
-			log.Printf("%s -> %s", srcLink, dstLink)
+			// log.Printf("%s -> %s", srcLink, dstLink)
 			normalizedCount++
 		}
 
