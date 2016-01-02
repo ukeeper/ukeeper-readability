@@ -24,13 +24,14 @@ type UReadability struct {
 
 //Response from api calls
 type Response struct {
-	Content string `json:"content"`
-	Rich    string `json:"rich_content"`
-	Domain  string `json:"domain"`
-	URL     string `json:"url"`
-	Title   string `json:"title"`
-	Excerpt string `json:"excerpt"`
-	Image   string `json:"lead_image_url"`
+	Content   string   `json:"content"`
+	Rich      string   `json:"rich_content"`
+	Domain    string   `json:"domain"`
+	URL       string   `json:"url"`
+	Title     string   `json:"title"`
+	Excerpt   string   `json:"excerpt"`
+	Image     string   `json:"lead_image_url"`
+	AllImages []string `json:"images"`
 }
 
 var (
@@ -81,8 +82,9 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	rb.Rich = normalizeLinks(rb.Rich, resp.Request)
 	rb.Excerpt = f.getSnippet(rb.Content)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
-	if im, ok := getMainPic(darticle.Find("img"), reqURL); ok {
+	if im, allImgs, ok := extractPics(darticle.Find("img"), reqURL); ok {
 		rb.Image = im
+		rb.AllImages = allImgs
 	}
 
 	log.Printf("completed for %s, url=%s", rb.Title, rb.URL)
@@ -122,18 +124,19 @@ func (f UReadability) getSnippet(cleanText string) string {
 	return string(snippet) + " ..."
 }
 
-func getMainPic(imgSelect *goquery.Selection, url string) (image string, ok bool) {
+func extractPics(imgSelect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
 
 	images := make(map[int]string)
 
 	imgSelect.Each(func(i int, s *goquery.Selection) {
 		if im, ok := s.Attr("src"); ok {
 			images[getImageSize(im)] = im
+			allImages = append(allImages, im)
 		}
 	})
 
 	if len(images) == 0 {
-		return "", false
+		return "", nil, false
 	}
 
 	//get biggest picture
@@ -142,9 +145,9 @@ func getMainPic(imgSelect *goquery.Selection, url string) (image string, ok bool
 		keys = append(keys, k)
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
-	image = images[keys[0]]
-	log.Printf("total images from %s = %d, main=%s (%d)", url, len(images), image, keys[0])
-	return image, true
+	mainImage = images[keys[0]]
+	log.Printf("total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
+	return mainImage, allImages, true
 }
 
 func getImageSize(url string) int {
