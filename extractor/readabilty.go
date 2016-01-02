@@ -32,6 +32,7 @@ type Response struct {
 	Excerpt   string   `json:"excerpt"`
 	Image     string   `json:"lead_image_url"`
 	AllImages []string `json:"images"`
+	AllLinks  []string `json:"links"`
 }
 
 var (
@@ -79,7 +80,7 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 
 	rb.Content, rb.Rich = doc.Content()
 	rb.Content = f.getText(rb.Content, rb.Title)
-	rb.Rich = normalizeLinks(rb.Rich, resp.Request)
+	rb.Rich, rb.AllLinks = normalizeLinks(rb.Rich, resp.Request)
 	rb.Excerpt = f.getSnippet(rb.Content)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
 	if im, allImgs, ok := extractPics(darticle.Find("img"), reqURL); ok {
@@ -168,7 +169,7 @@ func getImageSize(url string) int {
 	return len(data)
 }
 
-func normalizeLinks(data string, reqContext *http.Request) string {
+func normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
 
 	absoluteLink := func(link string) (absLink string, chnaged bool) {
 		if r, err := reqContext.URL.Parse(link); err == nil {
@@ -177,20 +178,22 @@ func normalizeLinks(data string, reqContext *http.Request) string {
 		return "", false
 	}
 
-	result := data
+	result = data
 	matches := reLinks.FindAllStringSubmatch(data, -1)
 	normalizedCount := 0
 	for _, m := range matches {
 		srcLink := m[len(m)-1] //link in last element of the group
-		if dstLink, changed := absoluteLink(srcLink); changed {
+		dstLink := srcLink
+		if absLink, changed := absoluteLink(srcLink); changed {
+			dstLink = absLink
 			srcLink := fmt.Sprintf(`"%s"`, srcLink)
-			dstLink := fmt.Sprintf(`"%s"`, dstLink)
-			result = strings.Replace(result, srcLink, dstLink, -1)
+			absLink = fmt.Sprintf(`"%s"`, absLink)
+			result = strings.Replace(result, srcLink, absLink, -1)
 			// log.Printf("%s -> %s", srcLink, dstLink)
 			normalizedCount++
 		}
-
+		links = append(links, dstLink)
 	}
 	log.Printf("normalized %d links", normalizedCount)
-	return result
+	return result, links
 }

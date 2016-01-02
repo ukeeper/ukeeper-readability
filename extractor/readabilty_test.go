@@ -1,6 +1,7 @@
 package extractor
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"testing"
@@ -40,6 +41,10 @@ func TestExtactGeneral(t *testing.T) {
 	assert.Equal(t, "UWP - Выпуск 369 22-11-2015 | Comments Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по ...", a.Excerpt)
 	assert.Equal(t, "http://podcast.umputun.com/images/uwp/uwp369.jpg", a.Image)
 	assert.Equal(t, "podcast.umputun.com", a.Domain)
+	assert.Equal(t, 10, len(a.AllLinks))
+	assert.Equal(t, "http://podcast.umputun.com/p/2015/11/22/podcast-369/#disqus_thread", a.AllLinks[0])
+	assert.Equal(t, "http://podcast.umputun.com/images/uwp/uwp369.jpg", a.AllLinks[1])
+	log.Printf("links=%v", a.AllLinks)
 
 }
 
@@ -58,8 +63,9 @@ func TestExtractPics(t *testing.T) {
 func TestNormilizeLinks(t *testing.T) {
 	inp := `blah <img src="/aaa.png"/> sdfasd <a href="/blah2/aa.link">something</a> blah33 <img src="//aaa.com/xyz.jpg">xx</img>`
 	u, _ := url.Parse("http://umputun.com/blah")
-	out := normalizeLinks(inp, &http.Request{URL: u})
+	out, links := normalizeLinks(inp, &http.Request{URL: u})
 	assert.Equal(t, `blah <img src="http://umputun.com/aaa.png"/> sdfasd <a href="http://umputun.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
+	assert.Equal(t, 3, len(links))
 }
 
 func TestNormilizeLinksIssue(t *testing.T) {
