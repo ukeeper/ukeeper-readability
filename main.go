@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"umputun.com/ureadability/extractor"
-	"umputun.com/ureadability/rest"
+	"umputun.com/ukeeper/ureadability/extractor"
+	"umputun.com/ukeeper/ureadability/rest"
 
 	"github.com/jessevdk/go-flags"
 )
