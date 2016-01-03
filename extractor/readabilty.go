@@ -13,7 +13,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mauidude/go-readability"
-	"umputun.com/ureadability/sanitize"
+	"umputun.com/ukeeper/ureadability/sanitize"
 )
 
 //UReadability implements fetcher & exrtactor for local readbility-like functionality

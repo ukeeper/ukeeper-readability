@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
-	"umputun.com/ureadability/extractor"
+	"umputun.com/ukeeper/ureadability/extractor"
 )
 
 //Server basic rest server to access msgs from mongo
