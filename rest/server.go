@@ -20,7 +20,11 @@ func (r Server) Run() {
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	router.Use(logger())
+	router.Use(func(c *gin.Context) {
+		t := time.Now()
+		c.Next()
+		log.Printf("%s %s %s %v %d", c.Request.Method, c.Request.URL.Path, c.ClientIP(), time.Since(t), c.Writer.Status())
+	})
 
 	router.POST("/api/v1/extract", r.extractArticle)
 	router.GET("/api/content/v1/parser", r.extractArticleEmulateReadability)
@@ -64,13 +68,4 @@ func (r Server) extractArticleEmulateReadability(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, res)
-}
-
-func logger() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		t := time.Now()
-		c.Next()
-		latency := time.Since(t)
-		log.Printf("%s %s %s %v %d", c.Request.Method, c.Request.URL.Path, c.ClientIP(), latency, c.Writer.Status())
-	}
 }
