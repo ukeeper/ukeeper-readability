@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	"github.com/gin-gonic/gin"
 	"umputun.com/ukeeper/ureadability/extractor"
 )
 
@@ -17,56 +17,47 @@ type Server struct {
 func (r Server) Run() {
 	log.Printf("activate rest server")
 
-	api := rest.NewApi()
-	api.Use(rest.DefaultCommonStack...)
+	router := gin.Default()
+	router.POST("/api/v1/extract", r.extractArticle)
+	router.GET("/api/content/v1/parser", r.extractArticleEmulateReadability)
 
-	router, err := rest.MakeRouter(
-		rest.Post("/api/v1/extract", r.extractArticle),
-		rest.Get("/api/content/v1/parser", r.extractArticleEmulateReadability),
-	)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	api.SetApp(router)
-	log.Fatal(http.ListenAndServe(":8080", api.MakeHandler()))
+	log.Fatal(router.Run(":8080"))
 }
 
-func (r Server) extractArticle(w rest.ResponseWriter, req *rest.Request) {
+func (r Server) extractArticle(c *gin.Context) {
 
 	artRequest := extractor.Response{}
-	err := req.DecodeJsonPayload(&artRequest)
+
+	err := c.BindJSON(&artRequest)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	res, err := r.Readability.Extract(artRequest.URL)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	w.WriteJson(res)
+	c.JSON(http.StatusOK, res)
 }
 
 //emulate radability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
-func (r Server) extractArticleEmulateReadability(w rest.ResponseWriter, req *rest.Request) {
-	query := req.URL.Query()
-	token := query.Get("token")
+func (r Server) extractArticleEmulateReadability(c *gin.Context) {
+	token := c.Query("token")
 	if token == "" {
-		rest.Error(w, "no token passed", http.StatusExpectationFailed)
+		c.JSON(http.StatusExpectationFailed, gin.H{"error": "no token passed"})
 		return
 	}
-	url := query.Get("url")
+	url := c.Query("url")
 	if url == "" {
-		rest.Error(w, "no url passed", http.StatusExpectationFailed)
+		c.JSON(http.StatusExpectationFailed, gin.H{"error": "no url passed"})
 		return
 	}
 	res, err := r.Readability.Extract(url)
 	if err != nil {
-		rest.Error(w, err.Error(), http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	w.WriteJson(res)
-
+	c.JSON(http.StatusOK, res)
 }
