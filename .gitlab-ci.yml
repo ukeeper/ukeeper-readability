@@ -12,6 +12,7 @@ build_app:
         - go get -v
         - go get -t ./...
         - go test  -v -short -cover ./...
+        # - GO15VENDOREXPERIMENT=1 go build -ldflags "-X main.gitRevision=$(git --no-pager log -1 --format=%h/%aI)" -o /srv/ureadability
         - GO15VENDOREXPERIMENT=1 go build -o /srv/ureadability
     artifacts:
         paths:
