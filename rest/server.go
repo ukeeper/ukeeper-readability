@@ -20,6 +20,7 @@ func (r Server) Run() {
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+	router.Use(gin.Recovery())
 	router.Use(func(c *gin.Context) {
 		t := time.Now()
 		c.Next()

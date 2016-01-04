@@ -20,6 +20,7 @@ import (
 type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
+	Debug       bool
 }
 
 //Response from api calls
@@ -80,10 +81,10 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 
 	rb.Content, rb.Rich = doc.Content()
 	rb.Content = f.getText(rb.Content, rb.Title)
-	rb.Rich, rb.AllLinks = normalizeLinks(rb.Rich, resp.Request)
+	rb.Rich, rb.AllLinks = f.normalizeLinks(rb.Rich, resp.Request)
 	rb.Excerpt = f.getSnippet(rb.Content)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
-	if im, allImgs, ok := extractPics(darticle.Find("img"), reqURL); ok {
+	if im, allImgs, ok := f.extractPics(darticle.Find("img"), reqURL); ok {
 		rb.Image = im
 		rb.AllImages = allImgs
 	}
@@ -100,6 +101,8 @@ func (f UReadability) getText(content string, title string) string {
 
 	//replace multiple spaces by one space
 	cleanText = reSpaces.ReplaceAllString(cleanText, " ")
+
+	//fix joined sentences due lack of \n
 	matches := reDot.FindAllStringSubmatch(cleanText, -1)
 	for _, m := range matches {
 		src := m[0]
@@ -125,13 +128,13 @@ func (f UReadability) getSnippet(cleanText string) string {
 	return string(snippet) + " ..."
 }
 
-func extractPics(imgSelect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
+func (f UReadability) extractPics(imgSelect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
 
 	images := make(map[int]string)
 
 	imgSelect.Each(func(i int, s *goquery.Selection) {
 		if im, ok := s.Attr("src"); ok {
-			images[getImageSize(im)] = im
+			images[f.getImageSize(im)] = im
 			allImages = append(allImages, im)
 		}
 	})
@@ -147,11 +150,11 @@ func extractPics(imgSelect *goquery.Selection, url string) (mainImage string, al
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
 	mainImage = images[keys[0]]
-	log.Printf("total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
+	f.debugf("total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
 	return mainImage, allImages, true
 }
 
-func getImageSize(url string) int {
+func (f UReadability) getImageSize(url string) int {
 	httpClient := &http.Client{Timeout: time.Second * 30}
 	req, err := http.NewRequest("GET", url, nil)
 	req.Close = true
@@ -169,7 +172,7 @@ func getImageSize(url string) int {
 	return len(data)
 }
 
-func normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
+func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
 
 	absoluteLink := func(link string) (absLink string, chnaged bool) {
 		if r, err := reqContext.URL.Parse(link); err == nil {
@@ -189,11 +192,17 @@ func normalizeLinks(data string, reqContext *http.Request) (result string, links
 			srcLink := fmt.Sprintf(`"%s"`, srcLink)
 			absLink = fmt.Sprintf(`"%s"`, absLink)
 			result = strings.Replace(result, srcLink, absLink, -1)
-			// log.Printf("%s -> %s", srcLink, dstLink)
+			f.debugf("%s -> %s", srcLink, dstLink)
 			normalizedCount++
 		}
 		links = append(links, dstLink)
 	}
-	log.Printf("normalized %d links", normalizedCount)
+	f.debugf("normalized %d links", normalizedCount)
 	return result, links
+}
+
+func (f UReadability) debugf(format string, v ...interface{}) {
+	if f.Debug {
+		log.Printf(format, v)
+	}
 }
