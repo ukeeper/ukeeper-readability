@@ -61,9 +61,10 @@ func TestExtractPics(t *testing.T) {
 }
 
 func TestNormilizeLinks(t *testing.T) {
+	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	inp := `blah <img src="/aaa.png"/> sdfasd <a href="/blah2/aa.link">something</a> blah33 <img src="//aaa.com/xyz.jpg">xx</img>`
 	u, _ := url.Parse("http://umputun.com/blah")
-	out, links := normalizeLinks(inp, &http.Request{URL: u})
+	out, links := lr.normalizeLinks(inp, &http.Request{URL: u})
 	assert.Equal(t, `blah <img src="http://umputun.com/aaa.png"/> sdfasd <a href="http://umputun.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
 	assert.Equal(t, 3, len(links))
 }
