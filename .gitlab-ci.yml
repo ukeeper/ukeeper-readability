@@ -6,7 +6,7 @@ build_app:
     stage: build
     script:
         - export GO15VENDOREXPERIMENT=1
-        - mkdir -p /go/src/umputun.com
+        - mkdir -p /go/src/umputun.com/ukeeper
         - ln -s /builds/ukeeper/ureadability /go/src/umputun.com/ukeeper/ureadability
         - cd /go/src/umputun.com/ukeeper/ureadability
         - go get -v
