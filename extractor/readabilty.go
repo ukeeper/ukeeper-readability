@@ -42,12 +42,19 @@ var (
 	reDot    = regexp.MustCompile(`\D(\.)\S`)
 )
 
+const userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
+
 //Extract fetches page and retrive article
 func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	log.Printf("extract %s", reqURL)
 	rb = &Response{}
+
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
-	resp, err := httpClient.Get(reqURL)
+	req, err := http.NewRequest("GET", reqURL, nil)
+	req.Close = true
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := httpClient.Do(req)
+
 	if err != nil {
 		log.Printf("failed to get anyting from %s, error=%v", reqURL, err)
 		return nil, err
@@ -158,6 +165,7 @@ func (f UReadability) getImageSize(url string) int {
 	httpClient := &http.Client{Timeout: time.Second * 30}
 	req, err := http.NewRequest("GET", url, nil)
 	req.Close = true
+	req.Header.Set("User-Agent", userAgent)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf("can't get %s, error=%v", url, err)
