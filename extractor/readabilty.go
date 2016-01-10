@@ -114,7 +114,18 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	}
 
 	customParser := func(body string, reqURL string, rule datastore.Rule) (content string, rich string, err error) {
-		return "", "", nil
+		log.Printf("custom extractor for %s", reqURL)
+		dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+		var res string
+		dbody.Find(rule.Content).Each(func(i int, s *goquery.Selection) {
+			if html, err := s.Html(); err == nil {
+				res += html
+			}
+		})
+		if res == "" {
+			return "", "", fmt.Errorf("nothing extracted from %s, rule=%v", reqURL, rule)
+		}
+		return f.getText(res, ""), res, nil
 	}
 
 	if f.Rules != nil {
