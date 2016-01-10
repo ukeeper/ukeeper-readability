@@ -146,10 +146,6 @@ func (f UReadability) getText(content string, title string) string {
 	return cleanText
 }
 
-func (f UReadability) customParse(url string, data string, rule datastore.Rule) (rb *Response, err error) {
-	return nil, fmt.Errorf("not found")
-}
-
 func (f UReadability) getSnippet(cleanText string) string {
 	cleanText = strings.Replace(cleanText, "\n", " ", -1)
 	size := len([]rune(cleanText))
