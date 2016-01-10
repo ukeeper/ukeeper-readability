@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"umputun.com/ukeeper/ureadability/datastore"
 	"umputun.com/ukeeper/ureadability/extractor"
 )
 
 //Server basic rest server to access msgs from mongo
 type Server struct {
 	Readability extractor.UReadability
+	Rules       datastore.Rules
 }
 
 //Run the lister and request's router, activate rest server

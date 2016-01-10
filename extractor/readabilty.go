@@ -13,6 +13,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mauidude/go-readability"
+	"umputun.com/ukeeper/ureadability/datastore"
 	"umputun.com/ukeeper/ureadability/sanitize"
 )
 
@@ -21,6 +22,7 @@ type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Debug       bool
+	Rules       *datastore.Rules
 }
 
 //Response from api calls
@@ -70,11 +72,12 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	}
 
 	body := string(dataBytes)
-	doc, err := readability.NewDocument(body)
+	rb.Content, rb.Rich, err = f.getContent(body, reqURL)
 	if err != nil {
 		log.Printf("failed to parse %s, error=%v", reqURL, err)
 		return nil, err
 	}
+
 	dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -86,7 +89,6 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 		rb.Domain = r.Host
 	}
 
-	rb.Content, rb.Rich = doc.Content()
 	rb.Content = f.getText(rb.Content, rb.Title)
 	rb.Rich, rb.AllLinks = f.normalizeLinks(rb.Rich, resp.Request)
 	rb.Excerpt = f.getSnippet(rb.Content)
@@ -98,6 +100,31 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 
 	log.Printf("completed for %s, url=%s", rb.Title, rb.URL)
 	return rb, nil
+}
+
+func (f UReadability) getContent(body string, reqURL string) (content string, rich string, err error) {
+
+	genParser := func(body string, reqURL string) (content string, rich string, err error) {
+		doc, err := readability.NewDocument(body)
+		if err != nil {
+			return "", "", err
+		}
+		content, rich = doc.Content()
+		return content, rich, nil
+	}
+
+	customParser := func(body string, reqURL string, rule datastore.Rule) (content string, rich string, err error) {
+		return "", "", nil
+	}
+
+	if f.Rules != nil {
+		r := *f.Rules
+		if rule, found := r.Get(reqURL); found {
+			return customParser(body, reqURL, rule)
+		}
+	}
+
+	return genParser(body, reqURL)
 }
 
 func (f UReadability) getText(content string, title string) string {
@@ -117,6 +144,10 @@ func (f UReadability) getText(content string, title string) string {
 		cleanText = strings.Replace(cleanText, src, dst, 1)
 	}
 	return cleanText
+}
+
+func (f UReadability) customParse(url string, data string, rule datastore.Rule) (rb *Response, err error) {
+	return nil, fmt.Errorf("not found")
 }
 
 func (f UReadability) getSnippet(cleanText string) string {
