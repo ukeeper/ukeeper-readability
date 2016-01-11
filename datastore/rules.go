@@ -2,6 +2,7 @@ package datastore
 
 //RulesDAO access methods to articles from/to mongo
 import (
+	"fmt"
 	"log"
 	"net/url"
 
@@ -82,4 +83,8 @@ func (r RulesDAO) All() []Rule {
 		return make([]Rule, 0)
 	}
 	return result
+}
+
+func (s Rule) String() string {
+	return fmt.Sprintf("{id=%s, domain=%s, content=%s, enabled=%v}", s.ID.Hex(), s.Domain, s.Content, s.Enabled)
 }
