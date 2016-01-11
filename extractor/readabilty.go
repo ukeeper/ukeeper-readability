@@ -133,6 +133,8 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 		if rule, found := r.Get(reqURL); found {
 			return customParser(body, reqURL, rule)
 		}
+	} else {
+		log.Printf("no rules defined!")
 	}
 
 	return genParser(body, reqURL)

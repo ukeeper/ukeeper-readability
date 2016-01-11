@@ -39,6 +39,7 @@ type Rule struct {
 func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	u, err := url.Parse(rURL)
 	if err != nil {
+		log.Printf("failed to parse url=%s, error=%v", rURL, err)
 		return Rule{}, false
 	}
 
