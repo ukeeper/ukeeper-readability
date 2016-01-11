@@ -59,7 +59,7 @@ func (m *MongoServer) collection(collection string, indexes []mgo.Index) *mgo.Co
 	log.Printf("create collection %s.%s", m.dbName, collection)
 	coll := m.session.DB(m.dbName).C(collection)
 	if err := coll.Create(&mgo.CollectionInfo{ForceIdIndex: true}); err != nil {
-		log.Fatalf("can;t create collection %s, error=%v", collection, err)
+		log.Printf("can't create collection %s, error=%v", collection, err)
 	}
 
 	for _, index := range indexes {
