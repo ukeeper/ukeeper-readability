@@ -22,7 +22,7 @@ type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Debug       bool
-	Rules       *datastore.Rules
+	Rules       datastore.Rules
 }
 
 //Response from api calls
@@ -129,7 +129,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	}
 
 	if f.Rules != nil {
-		r := *f.Rules
+		r := f.Rules
 		if rule, found := r.Get(reqURL); found {
 			return customParser(body, reqURL, rule)
 		}

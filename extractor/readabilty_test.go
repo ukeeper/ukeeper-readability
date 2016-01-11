@@ -1,10 +1,14 @@
 package extractor
 
 import (
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
+
+	"umputun.com/ukeeper/ureadability/datastore"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -73,4 +77,29 @@ func TestNormilizeLinksIssue(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	_, err := lr.Extract("https://git-scm.com/book/en/v2/Git-Tools-Submodules")
 	assert.Nil(t, err)
+}
+
+type RulesMock struct{}
+
+func (m RulesMock) Get(rURL string) (datastore.Rule, bool) {
+	return datastore.Rule{Content: "#content p, .post-title"}, true
+}
+
+func (m RulesMock) Save(rule datastore.Rule) (datastore.Rule, error) {
+	return datastore.Rule{}, nil
+}
+
+func TestGetContentCustom(t *testing.T) {
+	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}
+	httpClient := &http.Client{Timeout: time.Second * 30}
+	resp, err := httpClient.Get("http://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
+	assert.Nil(t, err)
+	defer resp.Body.Close()
+	dataBytes, err := ioutil.ReadAll(resp.Body)
+	body := string(dataBytes)
+
+	content, rich, err := lr.getContent(body, "http://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
+	assert.Nil(t, err)
+	assert.Equal(t, 6872, len(content))
+	assert.Equal(t, 6904, len(rich))
 }

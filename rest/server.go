@@ -32,6 +32,9 @@ func (r Server) Run() {
 	router.POST("/api/v1/extract", r.extractArticle)
 	router.GET("/api/content/v1/parser", r.extractArticleEmulateReadability)
 
+	router.POST("/api/v1/rule", r.SaveRule)
+	router.GET("/api/v1/rule", r.GetRule)
+
 	log.Fatal(router.Run(":8080"))
 }
 
@@ -71,4 +74,35 @@ func (r Server) extractArticleEmulateReadability(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, res)
+}
+
+func (r Server) GetRule(c *gin.Context) {
+	url := c.Query("url")
+	if url == "" {
+		c.JSON(http.StatusExpectationFailed, gin.H{"error": "no url passed"})
+		return
+	}
+
+	if rule, found := r.Rules.Get(url); found {
+		c.JSON(http.StatusOK, rule)
+		return
+	}
+
+	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
+}
+
+func (r Server) SaveRule(c *gin.Context) {
+	rule := datastore.Rule{}
+	err := c.BindJSON(&rule)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	srule, err := r.Rules.Save(rule)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, srule)
 }

@@ -4,7 +4,6 @@ package datastore
 import (
 	"log"
 	"net/url"
-	"time"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -13,6 +12,7 @@ import (
 //Rules interface
 type Rules interface {
 	Get(rURL string) (Rule, bool)
+	Save(rule Rule) (Rule, error)
 }
 
 //RulesDAO data-access obj for custom parsing rules, implements Rules
@@ -24,28 +24,42 @@ type RulesDAO struct {
 type Rule struct {
 	ID        bson.ObjectId `json:"id" bson:"_id,omitempty"`
 	Domain    string        `json:"domain"`
-	MatchURLs []string      `json:"match_url" bson:"match_urls,omitempty"`
+	MatchURLs []string      `json:"match_url,omitempty" bson:"match_urls,omitempty"`
 	Content   string        `json:"content"`
-	Author    string        `json:"author" bson:"author,omitempty"`
-	Ts        time.Time     `json:"ts" bson:"ts,omitempty"` //ts of original article
-	Excludes  []string      `json:"excludes" bson:"excludes,omitempty"`
-	TestURLs  []string      `json:"test_urls" bson:"test_urls"`
+	Author    string        `json:"author,omitempty" bson:"author,omitempty"`
+	Ts        string        `json:"ts,omitempty" bson:"ts,omitempty"` //ts of original article
+	Excludes  []string      `json:"excludes,omitempty" bson:"excludes,omitempty"`
+	TestURLs  []string      `json:"test_urls,omitempty" bson:"test_urls"`
 	User      string        `json:"user"`
 	Enabled   bool          `json:"enabled"`
 }
 
-func (r RulesDAO) get(rURL string) (Rule, bool) {
+func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	u, err := url.Parse(rURL)
 	if err != nil {
 		return Rule{}, false
 	}
 
 	var rules []Rule
-	r.Collection.Find(bson.M{"domain": u.Host, "enable": true}).All(&rules)
+	q := r.Collection.Find(bson.M{"domain": u.Host, "enabled": true})
+	log.Printf("query %v", q)
+	q.All(&rules)
 	if len(rules) == 0 {
 		return Rule{}, false
 	}
 	result := rules[0]
 	log.Printf("found rule for %s = [%v]", rURL, result)
 	return result, true
+}
+
+func (r RulesDAO) Save(rule Rule) (Rule, error) {
+	ch, err := r.Collection.Upsert(bson.M{"domain": rule.Domain}, rule)
+	if err != nil {
+		log.Printf("failed to save, error=%v, article=%v", err, rule)
+		return rule, err
+	}
+	if ch.UpsertedId != nil {
+		rule.ID = ch.UpsertedId.(bson.ObjectId)
+	}
+	return rule, err
 }

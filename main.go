@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"umputun.com/ukeeper/ureadability/datastore"
 	"umputun.com/ukeeper/ureadability/extractor"
 	"umputun.com/ukeeper/ureadability/rest"
 
@@ -26,7 +27,11 @@ func main() {
 		os.Exit(1)
 	}
 	log.Printf("started ureadability servcie, %s", gitRevision)
-	rest.Server{Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300}}.Run()
+
+	rest.Server{
+		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300},
+		Rules:       datastore.New(opts.Mongo, opts.MongoPasswd, opts.MongoDB, opts.MongoDelay).GetStores(),
+	}.Run()
 }
 
 func init() {
