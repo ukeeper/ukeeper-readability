@@ -36,7 +36,7 @@ func (r Server) Run() {
 
 	router.POST("/api/v1/rule", r.SaveRule)
 	router.DELETE("/api/v1/rule/:id", r.DeleteRule)
-	router.GET("/api/v1/rule/:url", r.GetRule)
+	router.GET("/api/v1/rule/#url", r.GetRule)
 	router.GET("/api/v1/rules", r.GetAllRules)
 
 	log.Fatal(router.Run(":8080"))
