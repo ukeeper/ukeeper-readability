@@ -78,9 +78,9 @@ func (r RulesDAO) Disable(id bson.ObjectId) error {
 
 //All returns list of all rules, both enabled and disabled
 func (r RulesDAO) All() []Rule {
-	result := make([]Rule, 0)
+	result := []Rule{}
 	if err := r.Collection.Find(bson.M{}).All(&result); err != nil {
-		return make([]Rule, 0)
+		return []Rule{}
 	}
 	return result
 }
