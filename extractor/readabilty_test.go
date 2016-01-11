@@ -88,6 +88,7 @@ func (m RulesMock) Get(rURL string) (datastore.Rule, bool) {
 }
 func (m RulesMock) Save(rule datastore.Rule) (datastore.Rule, error) { return datastore.Rule{}, nil }
 func (m RulesMock) Disable(id bson.ObjectId) error                   { return nil }
+func (m RulesMock) All() []datastore.Rule                            { return make([]datastore.Rule, 0) }
 
 func TestGetContentCustom(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}

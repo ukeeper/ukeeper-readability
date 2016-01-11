@@ -37,6 +37,7 @@ func (r Server) Run() {
 	router.POST("/api/v1/rule", r.SaveRule)
 	router.DELETE("/api/v1/rule/:id", r.DeleteRule)
 	router.GET("/api/v1/rule", r.GetRule)
+	router.GET("/api/v1/rules", r.GetAllRules)
 
 	log.Fatal(router.Run(":8080"))
 }
@@ -92,6 +93,10 @@ func (r Server) GetRule(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
+}
+
+func (r Server) GetAllRules(c *gin.Context) {
+	c.JSON(http.StatusOK, r.Rules.All())
 }
 
 func (r Server) SaveRule(c *gin.Context) {
