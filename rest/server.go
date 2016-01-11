@@ -36,7 +36,7 @@ func (r Server) Run() {
 
 	router.POST("/api/v1/rule", r.SaveRule)
 	router.DELETE("/api/v1/rule/:id", r.DeleteRule)
-	router.GET("/api/v1/rule/#url", r.GetRule)
+	router.GET("/api/v1/rule", r.GetRule)
 	router.GET("/api/v1/rules", r.GetAllRules)
 
 	log.Fatal(router.Run(":8080"))
@@ -81,17 +81,17 @@ func (r Server) extractArticleEmulateReadability(c *gin.Context) {
 }
 
 func (r Server) GetRule(c *gin.Context) {
-	url := c.Param("url")
+	url := c.Query("url")
 	if url == "" {
 		c.JSON(http.StatusExpectationFailed, gin.H{"error": "no url passed"})
 		return
 	}
 
 	if rule, found := r.Rules.Get(url); found {
+		log.Printf("rule for %s found, %v", url, rule)
 		c.JSON(http.StatusOK, rule)
 		return
 	}
-
 	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
 }
 

@@ -6,7 +6,7 @@
 
     POST /api/v1/rule {"domain": "aa.com", content="#content p"} - add/update custom rule
 	DELETE /api/v1/rule/:id - delete (disable) rule by ID
-    GET /api/v1/rule/:url - get rule for url
+    GET /api/v1/rule?url=http://blah.com/aaa - get rule for url
 	GET /api/v1/rules - get all rules, enabled and disabled
 
 

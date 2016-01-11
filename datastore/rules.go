@@ -47,6 +47,7 @@ func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	log.Printf("query %v", q)
 	q.All(&rules)
 	if len(rules) == 0 {
+		log.Printf("no custom rule for %s", rURL)
 		return Rule{}, false
 	}
 	result := rules[0]
