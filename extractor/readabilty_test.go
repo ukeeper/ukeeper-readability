@@ -89,6 +89,13 @@ func TestNormilizeLinks(t *testing.T) {
 	out, links := lr.normalizeLinks(inp, &http.Request{URL: u})
 	assert.Equal(t, `blah <img src="http://umputun.com/aaa.png"/> sdfasd <a href="http://umputun.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
 	assert.Equal(t, 3, len(links))
+
+	inp = `<body>
+		<img class="alignright size-full wp-image-944214 lazyloadableImage lazyLoad-fadeIn" alt="View Page Source" width="308" height="508" data-original="http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg" src="http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg"></body>`
+	out, links = lr.normalizeLinks(inp, &http.Request{URL: u})
+	assert.Equal(t, 1, len(links))
+	assert.Equal(t, "http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg", links[0])
+
 }
 
 func TestNormilizeLinksIssue(t *testing.T) {

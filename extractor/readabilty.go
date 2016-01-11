@@ -131,7 +131,9 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	if f.Rules != nil {
 		r := f.Rules
 		if rule, found := r.Get(reqURL); found {
-			return customParser(body, reqURL, rule)
+			if content, rich, err = customParser(body, reqURL, rule); err == nil {
+				return content, rich, err
+			}
 		}
 	} else {
 		log.Printf("no rules defined!")
@@ -197,7 +199,9 @@ func (f UReadability) extractPics(imgSelect *goquery.Selection, url string) (mai
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
 	mainImage = images[keys[0]]
-	f.debugf("total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
+	if f.Debug {
+		log.Printf("total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
+	}
 	return mainImage, allImages, true
 }
 
@@ -240,17 +244,15 @@ func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (res
 			srcLink := fmt.Sprintf(`"%s"`, srcLink)
 			absLink = fmt.Sprintf(`"%s"`, absLink)
 			result = strings.Replace(result, srcLink, absLink, -1)
-			f.debugf("%s -> %s", srcLink, dstLink)
+			if f.Debug {
+				log.Printf("normlized %s -> %s", srcLink, dstLink)
+			}
 			normalizedCount++
 		}
 		links = append(links, dstLink)
 	}
-	f.debugf("normalized %d links", normalizedCount)
-	return result, links
-}
-
-func (f UReadability) debugf(format string, v ...interface{}) {
 	if f.Debug {
-		log.Printf(format, v)
+		log.Printf("normalized %d links", normalizedCount)
 	}
+	return result, links
 }
