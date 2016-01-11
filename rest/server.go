@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"gopkg.in/mgo.v2/bson"
+
 	"github.com/gin-gonic/gin"
 	"umputun.com/ukeeper/ureadability/datastore"
 	"umputun.com/ukeeper/ureadability/extractor"
@@ -33,6 +35,7 @@ func (r Server) Run() {
 	router.GET("/api/content/v1/parser", r.extractArticleEmulateReadability)
 
 	router.POST("/api/v1/rule", r.SaveRule)
+	router.DELETE("/api/v1/rule/:id", r.DeleteRule)
 	router.GET("/api/v1/rule", r.GetRule)
 
 	log.Fatal(router.Run(":8080"))
@@ -98,11 +101,29 @@ func (r Server) SaveRule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
+	rule.Enabled = true
 	srule, err := r.Rules.Save(rule)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, srule)
+}
+
+func (r Server) DeleteRule(c *gin.Context) {
+	id := getBid(c.Param("id"))
+	err := r.Rules.Disable(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"disbled": id})
+}
+
+func getBid(id string) bson.ObjectId {
+	bid := bson.ObjectId("000000000000")
+	if id != "0" && bson.IsObjectIdHex(id) {
+		bid = bson.ObjectIdHex(id)
+	}
+	return bid
 }

@@ -13,6 +13,7 @@ import (
 type Rules interface {
 	Get(rURL string) (Rule, bool)
 	Save(rule Rule) (Rule, error)
+	Disable(id bson.ObjectId) error
 }
 
 //RulesDAO data-access obj for custom parsing rules, implements Rules
@@ -62,4 +63,8 @@ func (r RulesDAO) Save(rule Rule) (Rule, error) {
 		rule.ID = ch.UpsertedId.(bson.ObjectId)
 	}
 	return rule, err
+}
+
+func (r RulesDAO) Disable(id bson.ObjectId) error {
+	return r.Collection.Update(bson.M{"_id": id}, bson.M{"$set": bson.M{"enabled": false}})
 }

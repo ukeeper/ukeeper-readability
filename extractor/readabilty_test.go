@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/mgo.v2/bson"
+
 	"umputun.com/ukeeper/ureadability/datastore"
 
 	"github.com/stretchr/testify/assert"
@@ -84,10 +86,8 @@ type RulesMock struct{}
 func (m RulesMock) Get(rURL string) (datastore.Rule, bool) {
 	return datastore.Rule{Content: "#content p, .post-title"}, true
 }
-
-func (m RulesMock) Save(rule datastore.Rule) (datastore.Rule, error) {
-	return datastore.Rule{}, nil
-}
+func (m RulesMock) Save(rule datastore.Rule) (datastore.Rule, error) { return datastore.Rule{}, nil }
+func (m RulesMock) Disable(id bson.ObjectId) error                   { return nil }
 
 func TestGetContentCustom(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}
