@@ -79,6 +79,7 @@ func (r Server) extractArticleEmulateReadability(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+//GetRule find rule matching url param (domain portion only)
 func (r Server) GetRule(c *gin.Context) {
 	url := c.Query("url")
 	if url == "" {
@@ -94,10 +95,12 @@ func (r Server) GetRule(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
 }
 
+//GetAllRules returns list of all rules, including disabled
 func (r Server) GetAllRules(c *gin.Context) {
 	c.JSON(http.StatusOK, r.Readability.Rules.All())
 }
 
+//SaveRule upsert rule, forcing enabled=true
 func (r Server) SaveRule(c *gin.Context) {
 	rule := datastore.Rule{}
 	err := c.BindJSON(&rule)
@@ -114,6 +117,7 @@ func (r Server) SaveRule(c *gin.Context) {
 	c.JSON(http.StatusOK, srule)
 }
 
+//DeleteRule marks rule as disbaled
 func (r Server) DeleteRule(c *gin.Context) {
 	id := getBid(c.Param("id"))
 	err := r.Readability.Rules.Disable(id)
