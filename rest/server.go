@@ -15,7 +15,6 @@ import (
 //Server basic rest server to access msgs from mongo
 type Server struct {
 	Readability extractor.UReadability
-	Rules       datastore.Rules
 }
 
 //Run the lister and request's router, activate rest server
@@ -87,7 +86,7 @@ func (r Server) GetRule(c *gin.Context) {
 		return
 	}
 
-	if rule, found := r.Rules.Get(url); found {
+	if rule, found := r.Readability.Rules.Get(url); found {
 		log.Printf("rule for %s found, %v", url, rule)
 		c.JSON(http.StatusOK, rule)
 		return
@@ -96,7 +95,7 @@ func (r Server) GetRule(c *gin.Context) {
 }
 
 func (r Server) GetAllRules(c *gin.Context) {
-	c.JSON(http.StatusOK, r.Rules.All())
+	c.JSON(http.StatusOK, r.Readability.Rules.All())
 }
 
 func (r Server) SaveRule(c *gin.Context) {
@@ -107,7 +106,7 @@ func (r Server) SaveRule(c *gin.Context) {
 		return
 	}
 	rule.Enabled = true
-	srule, err := r.Rules.Save(rule)
+	srule, err := r.Readability.Rules.Save(rule)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -117,7 +116,7 @@ func (r Server) SaveRule(c *gin.Context) {
 
 func (r Server) DeleteRule(c *gin.Context) {
 	id := getBid(c.Param("id"))
-	err := r.Rules.Disable(id)
+	err := r.Readability.Rules.Disable(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

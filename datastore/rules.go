@@ -36,6 +36,7 @@ type Rule struct {
 	Enabled   bool          `json:"enabled"`
 }
 
+//Get rule by url. Checks if found in mongo, matching by domain
 func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	u, err := url.Parse(rURL)
 	if err != nil {
@@ -56,6 +57,7 @@ func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	return result, true
 }
 
+//Save upsert rule and returns one with ID for insterted one only
 func (r RulesDAO) Save(rule Rule) (Rule, error) {
 	ch, err := r.Collection.Upsert(bson.M{"domain": rule.Domain}, rule)
 	if err != nil {
@@ -68,10 +70,12 @@ func (r RulesDAO) Save(rule Rule) (Rule, error) {
 	return rule, err
 }
 
+//Disable marks enabled=false, by id
 func (r RulesDAO) Disable(id bson.ObjectId) error {
 	return r.Collection.Update(bson.M{"_id": id}, bson.M{"$set": bson.M{"enabled": false}})
 }
 
+//All returns list of all rules, both enabled and disabled
 func (r RulesDAO) All() []Rule {
 	result := make([]Rule, 0)
 	r.Collection.Find(bson.M{}).All(&result)

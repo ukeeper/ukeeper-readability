@@ -28,10 +28,7 @@ func main() {
 	}
 	log.Printf("started ureadability servcie, %s", gitRevision)
 	rules := datastore.New(opts.Mongo, opts.MongoPasswd, opts.MongoDB, opts.MongoDelay).GetStores()
-	rest.Server{
-		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: rules},
-		Rules:       rules,
-	}.Run()
+	rest.Server{Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: rules}}.Run()
 }
 
 func init() {
