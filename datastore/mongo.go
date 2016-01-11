@@ -58,10 +58,14 @@ func (m *MongoServer) GetStores() (rules RulesDAO) {
 func (m *MongoServer) collection(collection string, indexes []mgo.Index) *mgo.Collection {
 	log.Printf("create collection %s.%s", m.dbName, collection)
 	coll := m.session.DB(m.dbName).C(collection)
-	coll.Create(&mgo.CollectionInfo{ForceIdIndex: true})
+	if err := coll.Create(&mgo.CollectionInfo{ForceIdIndex: true}); err != nil {
+		log.Fatalf("can;t create collection %s, error=%v", collection, err)
+	}
 
 	for _, index := range indexes {
-		coll.EnsureIndex(index)
+		if err := coll.EnsureIndex(index); err != nil {
+			log.Printf("can't ensure index=%v, error=%v", index, err)
+		}
 	}
 	return coll
 }

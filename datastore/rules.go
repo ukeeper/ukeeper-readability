@@ -47,8 +47,8 @@ func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	var rules []Rule
 	q := r.Collection.Find(bson.M{"domain": u.Host, "enabled": true})
 	log.Printf("query %v", q)
-	q.All(&rules)
-	if len(rules) == 0 {
+	err = q.All(&rules)
+	if err != nil && len(rules) == 0 {
 		log.Printf("no custom rule for %s", rURL)
 		return Rule{}, false
 	}
@@ -78,6 +78,8 @@ func (r RulesDAO) Disable(id bson.ObjectId) error {
 //All returns list of all rules, both enabled and disabled
 func (r RulesDAO) All() []Rule {
 	result := make([]Rule, 0)
-	r.Collection.Find(bson.M{}).All(&result)
+	if err := r.Collection.Find(bson.M{}).All(&result); err != nil {
+		return make([]Rule, 0)
+	}
 	return result
 }
