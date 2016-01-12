@@ -36,7 +36,9 @@ func (r Server) Run() {
 	router.POST("/api/v1/rule", r.SaveRule)
 	router.DELETE("/api/v1/rule/:id", r.DeleteRule)
 	router.GET("/api/v1/rule", r.GetRule)
+	router.GET("/api/v1/rule/:id", r.GetRuleByID)
 	router.GET("/api/v1/rules", r.GetAllRules)
+	router.POST("/api/v1/auth", r.AuthFake)
 
 	log.Fatal(router.Run(":8080"))
 }
@@ -95,6 +97,17 @@ func (r Server) GetRule(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
 }
 
+//GetRuleByID returns rule by id
+func (r Server) GetRuleByID(c *gin.Context) {
+	id := getBid(c.Param("id"))
+	if rule, found := r.Readability.Rules.GetByID(id); found {
+		log.Printf("rule for %s found, %v", id.Hex(), rule)
+		c.JSON(http.StatusOK, rule)
+		return
+	}
+	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
+}
+
 //GetAllRules returns list of all rules, including disabled
 func (r Server) GetAllRules(c *gin.Context) {
 	c.JSON(http.StatusOK, r.Readability.Rules.All())
@@ -126,6 +139,12 @@ func (r Server) DeleteRule(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"disbled": id})
+}
+
+//AuthFake just a dummy post request used for external check for protected resource
+func (r Server) AuthFake(c *gin.Context) {
+	t := time.Now()
+	c.JSON(http.StatusOK, gin.H{"pong": t.Format("20060102150405")})
 }
 
 func getBid(id string) bson.ObjectId {

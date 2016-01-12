@@ -81,6 +81,7 @@ type RulesMock struct{}
 func (m RulesMock) Get(rURL string) (datastore.Rule, bool) {
 	return datastore.Rule{Content: "#content p, .post-title"}, true
 }
+func (m RulesMock) GetByID(id bson.ObjectId) (datastore.Rule, bool)  { return datastore.Rule{}, false }
 func (m RulesMock) Save(rule datastore.Rule) (datastore.Rule, error) { return datastore.Rule{}, nil }
 func (m RulesMock) Disable(id bson.ObjectId) error                   { return nil }
 func (m RulesMock) All() []datastore.Rule                            { return make([]datastore.Rule, 0) }

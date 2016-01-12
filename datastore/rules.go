@@ -13,6 +13,7 @@ import (
 //Rules interface
 type Rules interface {
 	Get(rURL string) (Rule, bool)
+	GetByID(id bson.ObjectId) (Rule, bool)
 	Save(rule Rule) (Rule, error)
 	Disable(id bson.ObjectId) error
 	All() []Rule
@@ -56,6 +57,13 @@ func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	result := rules[0]
 	log.Printf("found rule for %s = [%v]", rURL, result)
 	return result, true
+}
+
+//GetByID returns record by id
+func (r RulesDAO) GetByID(id bson.ObjectId) (Rule, bool) {
+	var rule Rule
+	err := r.Collection.Find(bson.M{"_id": id}).One(&rule)
+	return rule, err == nil
 }
 
 //Save upsert rule and returns one with ID for insterted one only
