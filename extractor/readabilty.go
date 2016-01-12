@@ -129,10 +129,10 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	if f.Rules != nil {
 		r := f.Rules
 		if rule, found := r.Get(reqURL); found {
-			if content, rich, err = customParser(body, reqURL, rule); err != nil {
-				log.Printf("custom extractor failed for %s, error=%v", reqURL, err)
+			if content, rich, err = customParser(body, reqURL, rule); err == nil {
 				return content, rich, err
 			}
+			log.Printf("custom extractor failed for %s, error=%v", reqURL, err)
 		}
 	} else {
 		log.Printf("no rules defined!")
