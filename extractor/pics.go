@@ -10,11 +10,11 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func (f UReadability) extractPics(imgSelect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
+func (f UReadability) extractPics(iselect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
 
 	images := make(map[int]string)
 
-	imgSelect.Each(func(i int, s *goquery.Selection) {
+	iselect.Each(func(i int, s *goquery.Selection) {
 		if im, ok := s.Attr("src"); ok {
 			images[f.getImageSize(im)] = im
 			allImages = append(allImages, im)

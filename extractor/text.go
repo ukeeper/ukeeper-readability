@@ -6,6 +6,7 @@ import (
 	"umputun.com/ukeeper/ureadability/sanitize"
 )
 
+//get clean text from html content
 func (f UReadability) getText(content string, title string) string {
 	cleanText := sanitize.HTML(content)
 	cleanText = strings.Replace(cleanText, title, "", 1) //get rid of title in snippet
@@ -25,6 +26,7 @@ func (f UReadability) getText(content string, title string) string {
 	return cleanText
 }
 
+//get snippet from clean text content
 func (f UReadability) getSnippet(cleanText string) string {
 	cleanText = strings.Replace(cleanText, "\n", " ", -1)
 	size := len([]rune(cleanText))
@@ -32,6 +34,7 @@ func (f UReadability) getSnippet(cleanText string) string {
 		size = f.SnippetSize
 	}
 	snippet := []rune(cleanText)[:size]
+	//go back in snippet and found first space
 	for i := len(snippet) - 1; i >= 0; i-- {
 		if snippet[i] == ' ' {
 			snippet = snippet[:i]

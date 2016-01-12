@@ -100,8 +100,10 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	return rb, nil
 }
 
+//gets content from raw body string
 func (f UReadability) getContent(body string, reqURL string) (content string, rich string, err error) {
 
+	//general parser
 	genParser := func(body string, reqURL string) (content string, rich string, err error) {
 		doc, err := readability.NewDocument(body)
 		if err != nil {
@@ -111,6 +113,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 		return content, rich, nil
 	}
 
+	//custom rules parser
 	customParser := func(body string, reqURL string, rule datastore.Rule) (content string, rich string, err error) {
 		log.Printf("custom extractor for %s", reqURL)
 		dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
@@ -132,7 +135,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 			if content, rich, err = customParser(body, reqURL, rule); err == nil {
 				return content, rich, err
 			}
-			log.Printf("custom extractor failed for %s, error=%v", reqURL, err)
+			log.Printf("custom extractor failed for %s, error=%v", reqURL, err) //back to general parser
 		}
 	} else {
 		log.Printf("no rules defined!")
@@ -141,6 +144,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	return genParser(body, reqURL)
 }
 
+//makes all links absolute and returns all found links
 func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
 
 	absoluteLink := func(link string) (absLink string, chnaged bool) {
