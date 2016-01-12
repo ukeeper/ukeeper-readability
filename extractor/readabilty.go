@@ -7,14 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mauidude/go-readability"
 	"umputun.com/ukeeper/ureadability/datastore"
-	"umputun.com/ukeeper/ureadability/sanitize"
 )
 
 //UReadability implements fetcher & exrtactor for local readbility-like functionality
@@ -141,88 +139,6 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	}
 
 	return genParser(body, reqURL)
-}
-
-func (f UReadability) getText(content string, title string) string {
-	cleanText := sanitize.HTML(content)
-	cleanText = strings.Replace(cleanText, title, "", 1) //get rid of title in snippet
-	cleanText = strings.Replace(cleanText, "\t", " ", -1)
-	cleanText = strings.TrimSpace(cleanText)
-
-	//replace multiple spaces by one space
-	cleanText = reSpaces.ReplaceAllString(cleanText, " ")
-
-	//fix joined sentences due lack of \n
-	matches := reDot.FindAllStringSubmatch(cleanText, -1)
-	for _, m := range matches {
-		src := m[0]
-		dst := strings.Replace(src, ".", ". ", 1)
-		cleanText = strings.Replace(cleanText, src, dst, 1)
-	}
-	return cleanText
-}
-
-func (f UReadability) getSnippet(cleanText string) string {
-	cleanText = strings.Replace(cleanText, "\n", " ", -1)
-	size := len([]rune(cleanText))
-	if size > f.SnippetSize {
-		size = f.SnippetSize
-	}
-	snippet := []rune(cleanText)[:size]
-	for i := len(snippet) - 1; i >= 0; i-- {
-		if snippet[i] == ' ' {
-			snippet = snippet[:i]
-			break
-		}
-	}
-	return string(snippet) + " ..."
-}
-
-func (f UReadability) extractPics(imgSelect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
-
-	images := make(map[int]string)
-
-	imgSelect.Each(func(i int, s *goquery.Selection) {
-		if im, ok := s.Attr("src"); ok {
-			images[f.getImageSize(im)] = im
-			allImages = append(allImages, im)
-		}
-	})
-
-	if len(images) == 0 {
-		return "", nil, false
-	}
-
-	//get biggest picture
-	keys := make([]int, 0, len(images))
-	for k := range images {
-		keys = append(keys, k)
-	}
-	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
-	mainImage = images[keys[0]]
-	if f.Debug {
-		log.Printf("total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
-	}
-	return mainImage, allImages, true
-}
-
-func (f UReadability) getImageSize(url string) int {
-	httpClient := &http.Client{Timeout: time.Second * 30}
-	req, err := http.NewRequest("GET", url, nil)
-	req.Close = true
-	req.Header.Set("User-Agent", userAgent)
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		log.Printf("can't get %s, error=%v", url, err)
-		return 0
-	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("failed to get %s, err=%v", url, err)
-		return 0
-	}
-	return len(data)
 }
 
 func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
