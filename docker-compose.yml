@@ -1,0 +1,54 @@
+server:
+    build: .
+    log_driver: "json-file"
+    log_opt:
+        max-size: "10m"
+        max-file: "5"
+    hostname: ureadability
+    restart: always
+    container_name: ureadability
+
+    links:
+        - mongo
+    environment:
+        - MONGO:mongo
+        - MONGO_PASSWD=Squid3kIc6Dew4ad8Ci5
+        - MONGO_DELAY=10
+
+    ports:
+        - 8080
+
+webapp:
+    image: igoradamenko/ureadability-ui
+    log_driver: "json-file"
+    hostname: ureadability-ui
+    container_name: ureadability-ui
+
+nginx:
+    build: nginx
+    restart: always
+    hostname: nginx
+    container_name: rtnews-nginx-dev
+
+    links:
+        - server:ureadability
+        - webapp
+    ports:
+        - "8781:80"
+    volumes_from:
+        - webapp:ro
+    environment:
+        - NGINX_ADMIN=admin:$$apr1$$pDxqiBaw$$ZarbwfQAjupM3Tg9r/XcR0
+        - NGINX_TEST=test:$$apr1$$5s9yoqp3$$NdZSCZr7VTmLEc8Bv/bmq1
+
+mongo:
+    image: umputun/mongo-auth
+    log_driver: "json-file"
+    hostname: mongo
+    restart: always
+    container_name: ureadability-mongo
+
+    environment:
+        - MONGO_PASSWD=Squid3kIc6Dew4ad8Ci5
+    volumes:
+        - /tmp/mongodb:/data/db
