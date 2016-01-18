@@ -3,7 +3,7 @@ package extractor
 import (
 	"strings"
 
-	"umputun.com/ukeeper/ureadability/sanitize"
+	"umputun.com/ukeeper/ureadability/app/sanitize"
 )
 
 //get clean text from html content

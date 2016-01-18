@@ -1,9 +1,9 @@
 FROM golang
 
-ADD . /go/src/umputun.com/ukeeper/ureadability
+ADD . /go/src/umputun.com/ukeeper/ureadability/app
 ENV GO15VENDOREXPERIMENT=1
 RUN \
- cd /go/src/umputun.com/ukeeper/ureadability && \
+ cd /go/src/umputun.com/ukeeper/ureadability/app && \
  go get -v && \
  GO15VENDOREXPERIMENT=1 go build -o /srv/ureadability && \
  rm -rf /go/src/*

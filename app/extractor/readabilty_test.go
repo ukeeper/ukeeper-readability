@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
-	"umputun.com/ukeeper/ureadability/datastore"
+	"umputun.com/ukeeper/ureadability/app/datastore"
 
 	"github.com/stretchr/testify/assert"
 )
