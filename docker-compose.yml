@@ -1,5 +1,5 @@
 server:
-    build: .
+    build: app
     log_driver: "json-file"
     log_opt:
         max-size: "10m"
