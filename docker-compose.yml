@@ -28,7 +28,7 @@ nginx:
     build: nginx
     restart: always
     hostname: nginx
-    container_name: rtnews-nginx-dev
+    container_name: ureadability-nginx
 
     links:
         - server:ureadability
