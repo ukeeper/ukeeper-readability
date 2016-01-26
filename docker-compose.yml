@@ -10,8 +10,9 @@ server:
 
     links:
         - mongo
+
     environment:
-        - MONGO:mongo
+        - MONGO=mongo
         - MONGO_PASSWD=Squid3kIc6Dew4ad8Ci5
         - MONGO_DELAY=10
 
