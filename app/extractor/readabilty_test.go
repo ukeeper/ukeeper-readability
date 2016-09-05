@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
-	"umputun.com/ukeeper/ureadability/app/datastore"
+	"ukeeper.com/ureadability/app/datastore"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -57,9 +57,9 @@ func TestExtactGeneral(t *testing.T) {
 func TestNormilizeLinks(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	inp := `blah <img src="/aaa.png"/> sdfasd <a href="/blah2/aa.link">something</a> blah33 <img src="//aaa.com/xyz.jpg">xx</img>`
-	u, _ := url.Parse("http://umputun.com/blah")
+	u, _ := url.Parse("http://ukeeper.com/blah")
 	out, links := lr.normalizeLinks(inp, &http.Request{URL: u})
-	assert.Equal(t, `blah <img src="http://umputun.com/aaa.png"/> sdfasd <a href="http://umputun.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
+	assert.Equal(t, `blah <img src="http://ukeeper.com/aaa.png"/> sdfasd <a href="http://ukeeper.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
 	assert.Equal(t, 3, len(links))
 
 	inp = `<body>

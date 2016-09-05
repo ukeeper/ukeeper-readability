@@ -7,10 +7,10 @@ RUN \
  chown -R umputun:umputun /srv
 
 
-ADD . /go/src/umputun.com/ukeeper/ureadability/app
+ADD . /go/src/ukeeper.com/ureadability/app
 ENV GO15VENDOREXPERIMENT=1
 RUN \
- cd /go/src/umputun.com/ukeeper/ureadability/app && \
+ cd /go/src/ukeeper.com/ureadability/app && \
  go get -v && \
  GO15VENDOREXPERIMENT=1 go build -o /srv/ureadability && \
  rm -rf /go/src/*

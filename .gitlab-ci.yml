@@ -5,15 +5,14 @@ stages:
 build_app:
     stage: build
     script:
-        - export GO15VENDOREXPERIMENT=1
-        - mkdir -p /go/src/umputun.com/ukeeper/ureadability
-        - ln -s /builds/ukeeper/ureadability/app /go/src/umputun.com/ukeeper/ureadability/app
-        - cd /go/src/umputun.com/ukeeper/ureadability/app
+        - mkdir -p /go/src/ukeeper.com/ureadability
+        - ln -s /builds/ureadability/app /go/src/ukeeper.com/ureadability/app
+        - cd /go/src/ukeeper.com/ureadability/app
         - go get -v
         - go get -t ./...
         - go test  -v -short -cover ./...
-        # - GO15VENDOREXPERIMENT=1 go build -ldflags "-X main.gitRevision=$(git --no-pager log -1 --format=%h/%aI)" -o /srv/ureadability
-        - GO15VENDOREXPERIMENT=1 go build -o /srv/ureadability
+        # go build -ldflags "-X main.gitRevision=$(git --no-pager log -1 --format=%h/%aI)" -o /srv/ureadability
+        - go build -o /srv/ureadability
     artifacts:
         paths:
             - /srv/

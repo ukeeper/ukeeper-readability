@@ -15,7 +15,7 @@
 on master (dev version) prefix /ureadability should be added
 
 
-    http POST "master.radio-t.com:8780/ureadability/api/v1/rule" domain=blah.umputun.com content="#content p" enabled:=true
+    http POST "master.radio-t.com:8780/ureadability/api/v1/rule" domain=blah.ukeeper.com content="#content p" enabled:=true
     HTTP/1.1 200 OK
     Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
     Access-Control-Allow-Methods: GET, PUT, POST, DELETE, OPTIONS
@@ -30,7 +30,7 @@ on master (dev version) prefix /ureadability should be added
 
     {
         "content": "#content p",
-        "domain": "blah.umputun.com",
+        "domain": "blah.ukeeper.com",
         "enabled": true,
         "id": "56931595daa6d301279ba801",
         "user": ""
@@ -53,14 +53,14 @@ on master (dev version) prefix /ureadability should be added
     [
         {
             "content": "#content p",
-            "domain": "p.umputun.com",
+            "domain": "p.ukeeper.com",
             "enabled": true,
             "id": "5693123fdaa6d301279ba800",
             "user": ""
         },
         {
             "content": "#content p",
-            "domain": "blah.umputun.com",
+            "domain": "blah.ukeeper.com",
             "enabled": true,
             "id": "56931595daa6d301279ba801",
             "user": ""

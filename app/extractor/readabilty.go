@@ -12,7 +12,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mauidude/go-readability"
-	"umputun.com/ukeeper/ureadability/app/datastore"
+	"ukeeper.com/ureadability/app/datastore"
 )
 
 //UReadability implements fetcher & exrtactor for local readbility-like functionality
