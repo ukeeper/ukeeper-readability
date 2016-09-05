@@ -8,11 +8,10 @@ RUN \
 
 
 ADD . /go/src/ukeeper.com/ureadability/app
-ENV GO15VENDOREXPERIMENT=1
 RUN \
  cd /go/src/ukeeper.com/ureadability/app && \
  go get -v && \
- GO15VENDOREXPERIMENT=1 go build -o /srv/ureadability && \
+ go build -o /srv/ureadability && \
  rm -rf /go/src/*
 
 EXPOSE 8080
