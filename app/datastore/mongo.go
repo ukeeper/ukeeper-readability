@@ -7,7 +7,7 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-//MongoServer top level mongo ops
+// MongoServer top level mongo ops
 type MongoServer struct {
 	address string
 	creds   *mgo.Credential
@@ -15,7 +15,7 @@ type MongoServer struct {
 	dbName  string
 }
 
-//New MongoServer
+// New MongoServer
 func New(address string, password string, dbName string, delay int) (res *MongoServer) {
 	log.Printf("make new mongo server with ip=%s, db=%s, delay=%dsecs", address, dbName, delay)
 	if delay > 0 {
@@ -43,9 +43,8 @@ func New(address string, password string, dbName string, delay int) (res *MongoS
 	return &MongoServer{address: address, creds: creds, session: session, dbName: dbName}
 }
 
-//GetStores initialize collections and make indexes
+// GetStores initialize collections and make indexes
 func (m *MongoServer) GetStores() (rules RulesDAO) {
-
 	rIndexes := []mgo.Index{
 		{Key: []string{"enabled", "domain"}},
 		{Key: []string{"user", "domain", "enabled"}},
@@ -55,7 +54,7 @@ func (m *MongoServer) GetStores() (rules RulesDAO) {
 	return rules
 }
 
-//collection makes collection with indexes
+// collection makes collection with indexes
 func (m *MongoServer) collection(collection string, indexes []mgo.Index) *mgo.Collection {
 	log.Printf("create collection %s.%s", m.dbName, collection)
 	coll := m.session.DB(m.dbName).C(collection)

@@ -11,7 +11,6 @@ import (
 )
 
 func (f UReadability) extractPics(iselect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
-
 	images := make(map[int]string)
 
 	iselect.Each(func(i int, s *goquery.Selection) {
@@ -25,7 +24,7 @@ func (f UReadability) extractPics(iselect *goquery.Selection, url string) (mainI
 		return "", nil, false
 	}
 
-	//get biggest picture
+	// get biggest picture
 	keys := make([]int, 0, len(images))
 	for k := range images {
 		keys = append(keys, k)
