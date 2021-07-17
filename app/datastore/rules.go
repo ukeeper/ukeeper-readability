@@ -66,7 +66,7 @@ func (r RulesDAO) GetByID(id bson.ObjectId) (Rule, bool) {
 	return rule, err == nil
 }
 
-//Save upsert rule and returns one with ID for insterted one only
+//Save upsert rule and returns one with ID for interested one only
 func (r RulesDAO) Save(rule Rule) (Rule, error) {
 	ch, err := r.Collection.Upsert(bson.M{"domain": rule.Domain}, rule)
 	if err != nil {

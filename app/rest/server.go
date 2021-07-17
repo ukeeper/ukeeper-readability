@@ -61,7 +61,7 @@ func (r Server) extractArticle(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-//emulate radability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
+//emulate readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 func (r Server) extractArticleEmulateReadability(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
@@ -122,15 +122,15 @@ func (r Server) SaveRule(c *gin.Context) {
 		return
 	}
 	rule.Enabled = true
-	srule, err := r.Readability.Rules.Save(rule)
+	sRule, err := r.Readability.Rules.Save(rule)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, srule)
+	c.JSON(http.StatusOK, sRule)
 }
 
-//DeleteRule marks rule as disbaled
+//DeleteRule marks rule as disabled
 func (r Server) DeleteRule(c *gin.Context) {
 	id := getBid(c.Param("id"))
 	err := r.Readability.Rules.Disable(id)
@@ -138,6 +138,7 @@ func (r Server) DeleteRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// TODO: here is a typo, should be "disabled"
 	c.JSON(http.StatusOK, gin.H{"disbled": id})
 }
 

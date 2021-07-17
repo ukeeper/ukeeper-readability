@@ -43,15 +43,15 @@ func New(address string, password string, dbName string, delay int) (res *MongoS
 	return &MongoServer{address: address, creds: creds, session: session, dbName: dbName}
 }
 
-//GetStores initilize collections and make indexes
+//GetStores initialize collections and make indexes
 func (m *MongoServer) GetStores() (rules RulesDAO) {
 
-	rindexes := []mgo.Index{
+	rIndexes := []mgo.Index{
 		{Key: []string{"enabled", "domain"}},
 		{Key: []string{"user", "domain", "enabled"}},
 		{Key: []string{"domain", "match_urls"}},
 	}
-	rules = RulesDAO{Collection: m.collection("rules", rindexes)}
+	rules = RulesDAO{Collection: m.collection("rules", rIndexes)}
 	return rules
 }
 

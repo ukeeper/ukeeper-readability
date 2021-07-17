@@ -15,7 +15,7 @@ var gitRevision string
 
 var opts struct {
 	Mongo       string `short:"m" long:"mongo" env:"MONGO" description:"mongo host:port"`
-	MongoPasswd string `short:"p" long:"mongo-password" env:"MONGO_PASSWD" default:"" description:"mongo pssword"`
+	MongoPasswd string `short:"p" long:"mongo-password" env:"MONGO_PASSWD" default:"" description:"mongo password"`
 	MongoDelay  int    `long:"mongo-delay" env:"MONGO_DELAY" default:"0" description:"mongo initial delay"`
 	MongoDB     string `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
 	Debug       bool   `long:"dbg" env:"DEBUG" default:"false" description:"debug mode"`

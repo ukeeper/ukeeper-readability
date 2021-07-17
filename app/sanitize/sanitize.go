@@ -109,7 +109,7 @@ func HTML(s string) string {
 	} else {
 
 		// First remove line breaks etc as these have no meaning outside html tags (except pre)
-		// this means pre sections will lose formatting... but will result in less uninentional paras.
+		// this means pre sections will lose formatting... but will result in less unintentional params.
 		s = strings.Replace(s, "\n", "", -1)
 
 		// Then replace line breaks with newlines, to preserve that formatting
@@ -161,7 +161,7 @@ func HTML(s string) string {
 }
 
 // We are very restrictive as this is intended for ascii url slugs
-var illegalPath = regexp.MustCompile(`[^[:alnum:]\~\-\./]`)
+var illegalPath = regexp.MustCompile(`[^[:alnum:]~\-./]`)
 
 // Path makes a string safe to use as an url path.
 func Path(s string) string {
