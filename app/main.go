@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"ukeeper.com/ureadability/app/datastore"
-	"ukeeper.com/ureadability/app/extractor"
-	"ukeeper.com/ureadability/app/rest"
+	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/app/extractor"
+	"github.com/ukeeper/ukeeper-redabilty/app/rest"
 
 	"github.com/jessevdk/go-flags"
 )
@@ -28,7 +28,7 @@ func main() {
 	if _, err := flags.Parse(&opts); err != nil {
 		os.Exit(1)
 	}
-	log.Printf("started ureadability servcie, %s", gitRevision)
+	log.Printf("started ureadability service, %s", gitRevision)
 	rules := datastore.New(opts.Mongo, opts.MongoPasswd, opts.MongoDB, opts.MongoDelay).GetStores()
 	rest.Server{Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: rules, Debug: opts.Debug}}.Run()
 }

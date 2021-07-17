@@ -1,4 +1,4 @@
-module ukeeper.com/ureadability/app
+module github.com/ukeeper/ukeeper-redabilty/app
 
 go 1.14
 
