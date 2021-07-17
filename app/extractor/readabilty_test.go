@@ -32,7 +32,7 @@ func TestExtractURL(t *testing.T) {
 	assert.Equal(t, 9665, len(rb.Content))
 }
 
-func TestExtactGeneral(t *testing.T) {
+func TestExtractGeneral(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	a, err := lr.Extract("https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.Nil(t, err)
@@ -55,7 +55,7 @@ func TestExtactGeneral(t *testing.T) {
 
 }
 
-func TestNormilizeLinks(t *testing.T) {
+func TestNormalizeLinks(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	inp := `blah <img src="/aaa.png"/> sdfasd <a href="/blah2/aa.link">something</a> blah33 <img src="//aaa.com/xyz.jpg">xx</img>`
 	u, _ := url.Parse("http://ukeeper.com/blah")
@@ -71,7 +71,7 @@ func TestNormilizeLinks(t *testing.T) {
 
 }
 
-func TestNormilizeLinksIssue(t *testing.T) {
+func TestNormalizeLinksIssue(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	_, err := lr.Extract("https://git-scm.com/book/en/v2/Git-Tools-Submodules")
 	assert.Nil(t, err)
@@ -79,13 +79,13 @@ func TestNormilizeLinksIssue(t *testing.T) {
 
 type RulesMock struct{}
 
-func (m RulesMock) Get(rURL string) (datastore.Rule, bool) {
+func (m RulesMock) Get(_ string) (datastore.Rule, bool) {
 	return datastore.Rule{Content: "#content p, .post-title"}, true
 }
-func (m RulesMock) GetByID(id bson.ObjectId) (datastore.Rule, bool)  { return datastore.Rule{}, false }
-func (m RulesMock) Save(rule datastore.Rule) (datastore.Rule, error) { return datastore.Rule{}, nil }
-func (m RulesMock) Disable(id bson.ObjectId) error                   { return nil }
-func (m RulesMock) All() []datastore.Rule                            { return make([]datastore.Rule, 0) }
+func (m RulesMock) GetByID(_ bson.ObjectId) (datastore.Rule, bool) { return datastore.Rule{}, false }
+func (m RulesMock) Save(_ datastore.Rule) (datastore.Rule, error)  { return datastore.Rule{}, nil }
+func (m RulesMock) Disable(_ bson.ObjectId) error                  { return nil }
+func (m RulesMock) All() []datastore.Rule                          { return make([]datastore.Rule, 0) }
 
 func TestGetContentCustom(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}

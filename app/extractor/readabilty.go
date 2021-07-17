@@ -15,7 +15,7 @@ import (
 	"ukeeper.com/ureadability/app/readability"
 )
 
-//UReadability implements fetcher & exrtactor for local readbility-like functionality
+//UReadability implements fetcher & extractor for local readability-like functionality
 type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
@@ -44,13 +44,17 @@ var (
 
 const userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
 
-//Extract fetches page and retrive article
+//Extract fetches page and retrieve article
 func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	log.Printf("extract %s", reqURL)
 	rb = &Response{}
 
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
 	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		log.Printf("failed to create request for %s, error=%v", reqURL, err)
+		return nil, err
+	}
 	req.Close = true
 	req.Header.Set("User-Agent", userAgent)
 	resp, err := httpClient.Do(req)
@@ -91,9 +95,13 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	rb.Rich, rb.AllLinks = f.normalizeLinks(rb.Rich, resp.Request)
 	rb.Excerpt = f.getSnippet(rb.Content)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
-	if im, allImgs, ok := f.extractPics(darticle.Find("img"), reqURL); ok {
+	if err != nil {
+		log.Printf("failed to create document from reader, error=%v", err)
+		return nil, err
+	}
+	if im, allImages, ok := f.extractPics(darticle.Find("img"), reqURL); ok {
 		rb.Image = im
-		rb.AllImages = allImgs
+		rb.AllImages = allImages
 	}
 
 	log.Printf("completed for %s, url=%s", rb.Title, rb.URL)
@@ -150,7 +158,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 //makes all links absolute and returns all found links
 func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
 
-	absoluteLink := func(link string) (absLink string, chnaged bool) {
+	absoluteLink := func(link string) (absLink string, changed bool) {
 		if r, err := reqContext.URL.Parse(link); err == nil {
 			return r.String(), r.String() != link
 		}
