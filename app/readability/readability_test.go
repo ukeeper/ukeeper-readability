@@ -128,7 +128,6 @@ func TestOutputForWellKnownDocuments(t *testing.T) {
 		},
 	}
 
-	// TODO: where test_fixtures/ were lost?
 	for file, expectedOutput := range inputs {
 		bytes, err := ioutil.ReadFile("test_fixtures/" + file)
 		if err != nil {
