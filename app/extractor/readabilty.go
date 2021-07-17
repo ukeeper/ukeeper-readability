@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/mauidude/go-readability"
 	"ukeeper.com/ureadability/app/datastore"
+	"ukeeper.com/ureadability/app/readability"
 )
 
 //UReadability implements fetcher & exrtactor for local readbility-like functionality
@@ -117,6 +117,9 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	customParser := func(body string, reqURL string, rule datastore.Rule) (content string, rich string, err error) {
 		log.Printf("custom extractor for %s", reqURL)
 		dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+		if err != nil {
+			return "", "", err
+		}
 		var res string
 		dbody.Find(rule.Content).Each(func(i int, s *goquery.Selection) {
 			if html, err := s.Html(); err == nil {
