@@ -3,7 +3,7 @@ package extractor
 import (
 	"strings"
 
-	"ukeeper.com/ureadability/app/sanitize"
+	"github.com/ukeeper/ukeeper-redabilty/app/sanitize"
 )
 
 // get clean text from html content

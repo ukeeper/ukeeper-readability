@@ -14,20 +14,20 @@ RUN \
     else echo "skip tests and linter" ; fi
 
 RUN \
-    go build -o ureadability . && \
-    ls -la /app/ureadability
+    go build -o ukeeper-readability . && \
+    ls -la /app/ukeeper-readability
 
 # Run
 FROM umputun/baseimage:app-latest
 
 RUN apk add --update ca-certificates && update-ca-certificates
 
-COPY --from=build /app/ureadability /srv/
+COPY --from=build /app/ukeeper-readability /srv/
 
 RUN chown -R app:app /srv
 USER app
 WORKDIR /srv
 
 EXPOSE 8080
-CMD ["/srv/ureadability"]
-ENTRYPOINT ["/init.sh", "/srv/ureadability"]
+CMD ["/srv/ukeeper-readability"]
+ENTRYPOINT ["/init.sh", "/srv/ukeeper-readability"]

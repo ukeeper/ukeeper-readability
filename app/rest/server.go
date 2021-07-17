@@ -8,8 +8,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/gin-gonic/gin"
-	"ukeeper.com/ureadability/app/datastore"
-	"ukeeper.com/ureadability/app/extractor"
+	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/app/extractor"
 )
 
 // Server basic rest server to access msgs from mongo

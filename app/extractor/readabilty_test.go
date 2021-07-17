@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
-	"ukeeper.com/ureadability/app/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

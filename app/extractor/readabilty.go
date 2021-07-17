@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"ukeeper.com/ureadability/app/datastore"
-	"ukeeper.com/ureadability/app/readability"
+	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/app/readability"
 )
 
 // UReadability implements fetcher & extractor for local readability-like functionality
