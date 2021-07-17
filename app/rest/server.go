@@ -12,12 +12,12 @@ import (
 	"ukeeper.com/ureadability/app/extractor"
 )
 
-//Server basic rest server to access msgs from mongo
+// Server basic rest server to access msgs from mongo
 type Server struct {
 	Readability extractor.UReadability
 }
 
-//Run the lister and request's router, activate rest server
+// Run the lister and request's router, activate rest server
 func (r Server) Run() {
 	log.Printf("activate rest server")
 
@@ -44,7 +44,6 @@ func (r Server) Run() {
 }
 
 func (r Server) extractArticle(c *gin.Context) {
-
 	artRequest := extractor.Response{}
 
 	err := c.BindJSON(&artRequest)
@@ -61,7 +60,7 @@ func (r Server) extractArticle(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-//emulate readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
+// emulate readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 func (r Server) extractArticleEmulateReadability(c *gin.Context) {
 	token := c.Query("token")
 	if token == "" {
@@ -81,7 +80,7 @@ func (r Server) extractArticleEmulateReadability(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-//GetRule find rule matching url param (domain portion only)
+// GetRule find rule matching url param (domain portion only)
 func (r Server) GetRule(c *gin.Context) {
 	url := c.Query("url")
 	if url == "" {
@@ -97,7 +96,7 @@ func (r Server) GetRule(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
 }
 
-//GetRuleByID returns rule by id
+// GetRuleByID returns rule by id
 func (r Server) GetRuleByID(c *gin.Context) {
 	id := getBid(c.Param("id"))
 	if rule, found := r.Readability.Rules.GetByID(id); found {
@@ -108,12 +107,12 @@ func (r Server) GetRuleByID(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
 }
 
-//GetAllRules returns list of all rules, including disabled
+// GetAllRules returns list of all rules, including disabled
 func (r Server) GetAllRules(c *gin.Context) {
 	c.JSON(http.StatusOK, r.Readability.Rules.All())
 }
 
-//SaveRule upsert rule, forcing enabled=true
+// SaveRule upsert rule, forcing enabled=true
 func (r Server) SaveRule(c *gin.Context) {
 	rule := datastore.Rule{}
 	err := c.BindJSON(&rule)
@@ -130,7 +129,7 @@ func (r Server) SaveRule(c *gin.Context) {
 	c.JSON(http.StatusOK, sRule)
 }
 
-//DeleteRule marks rule as disabled
+// DeleteRule marks rule as disabled
 func (r Server) DeleteRule(c *gin.Context) {
 	id := getBid(c.Param("id"))
 	err := r.Readability.Rules.Disable(id)
@@ -142,7 +141,7 @@ func (r Server) DeleteRule(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"disbled": id})
 }
 
-//AuthFake just a dummy post request used for external check for protected resource
+// AuthFake just a dummy post request used for external check for protected resource
 func (r Server) AuthFake(c *gin.Context) {
 	t := time.Now()
 	c.JSON(http.StatusOK, gin.H{"pong": t.Format("20060102150405")})

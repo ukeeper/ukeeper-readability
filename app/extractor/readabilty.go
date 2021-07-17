@@ -15,7 +15,7 @@ import (
 	"ukeeper.com/ureadability/app/readability"
 )
 
-//UReadability implements fetcher & extractor for local readability-like functionality
+// UReadability implements fetcher & extractor for local readability-like functionality
 type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
@@ -23,7 +23,7 @@ type UReadability struct {
 	Rules       datastore.Rules
 }
 
-//Response from api calls
+// Response from api calls
 type Response struct {
 	Content   string   `json:"content"`
 	Rich      string   `json:"rich_content"`
@@ -44,7 +44,7 @@ var (
 
 const userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
 
-//Extract fetches page and retrieve article
+// Extract fetches page and retrieve article
 func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	log.Printf("extract %s", reqURL)
 	rb = &Response{}
@@ -108,11 +108,10 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	return rb, nil
 }
 
-//gets content from raw body string
+// gets content from raw body string
 func (f UReadability) getContent(body string, reqURL string) (content string, rich string, err error) {
-
-	//general parser
-	genParser := func(body string, reqURL string) (content string, rich string, err error) {
+	// general parser
+	genParser := func(body string) (content string, rich string, err error) {
 		doc, err := readability.NewDocument(body)
 		if err != nil {
 			return "", "", err
@@ -121,7 +120,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 		return content, rich, nil
 	}
 
-	//custom rules parser
+	// custom rules parser
 	customParser := func(body string, reqURL string, rule datastore.Rule) (content string, rich string, err error) {
 		log.Printf("custom extractor for %s", reqURL)
 		dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
@@ -146,18 +145,17 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 			if content, rich, err = customParser(body, reqURL, rule); err == nil {
 				return content, rich, err
 			}
-			log.Printf("custom extractor failed for %s, error=%v", reqURL, err) //back to general parser
+			log.Printf("custom extractor failed for %s, error=%v", reqURL, err) // back to general parser
 		}
 	} else {
 		log.Printf("no rules defined!")
 	}
 
-	return genParser(body, reqURL)
+	return genParser(body)
 }
 
-//makes all links absolute and returns all found links
+// makes all links absolute and returns all found links
 func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
-
 	absoluteLink := func(link string) (absLink string, changed bool) {
 		if r, err := reqContext.URL.Parse(link); err == nil {
 			return r.String(), r.String() != link
@@ -169,13 +167,13 @@ func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (res
 	matches := reLinks.FindAllStringSubmatch(data, -1)
 	normalizedCount := 0
 	for _, m := range matches {
-		srcLink := m[len(m)-1] //link in last element of the group
+		srcLink := m[len(m)-1] // link in last element of the group
 		dstLink := srcLink
 		if absLink, changed := absoluteLink(srcLink); changed {
 			dstLink = absLink
 			srcLink := fmt.Sprintf(`"%s"`, srcLink)
 			absLink = fmt.Sprintf(`"%s"`, absLink)
-			result = strings.Replace(result, srcLink, absLink, -1)
+			result = strings.ReplaceAll(result, srcLink, absLink)
 			if f.Debug {
 				log.Printf("normlized %s -> %s", srcLink, dstLink)
 			}

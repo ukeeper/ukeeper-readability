@@ -23,15 +23,12 @@ var opts struct {
 }
 
 func main() {
+	log.SetOutput(os.Stdout)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile | log.Lmicroseconds)
 	if _, err := flags.Parse(&opts); err != nil {
 		os.Exit(1)
 	}
 	log.Printf("started ureadability servcie, %s", gitRevision)
 	rules := datastore.New(opts.Mongo, opts.MongoPasswd, opts.MongoDB, opts.MongoDelay).GetStores()
 	rest.Server{Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: rules, Debug: opts.Debug}}.Run()
-}
-
-func init() {
-	log.SetOutput(os.Stdout)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile | log.Lmicroseconds)
 }

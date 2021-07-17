@@ -1,0 +1,45 @@
+run:
+  tests: false
+  timeout: 5m
+  output:
+    format: tab
+  skip-dirs:
+    - vendor
+    - readability
+linters:
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - gas
+    - errcheck
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - revive
+    - goprintffuncname
+    - gochecknoinits
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - megacheck
+    - nakedret
+    - rowserrcheck
+    - exportloopref
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+  disable-all: true
