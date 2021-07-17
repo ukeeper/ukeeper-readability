@@ -1,20 +1,33 @@
-FROM golang
+# Build
+FROM umputun/baseimage:buildgo-latest as build
 
-# add user and set TZ
+ARG SKIP_TEST
+
+ADD . /app
+WORKDIR /app
+
+# run tests
 RUN \
- adduser --disabled-password  --gecos "" -u 1001 umputun && \
- echo "America/Chicago" > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata && \
- chown -R umputun:umputun /srv
+    if [ -z "$SKIP_TEST" ] ; then \
+        go test -timeout=30s  ./... && \
+        golangci-lint run ; \
+    else echo "skip tests and linter" ; fi
 
-
-ADD . /go/src/ukeeper.com/ureadability/app
 RUN \
- cd /go/src/ukeeper.com/ureadability/app && \
- go get -v && \
- go build -o /srv/ureadability && \
- rm -rf /go/src/*
+    go build -o ureadability . && \
+    ls -la /app/ureadability
+
+# Run
+FROM umputun/baseimage:app-latest
+
+RUN apk add --update ca-certificates && update-ca-certificates
+
+COPY --from=build /app/ureadability /srv/
+
+RUN chown -R app:app /srv
+USER app
+WORKDIR /srv
 
 EXPOSE 8080
-USER umputun
-WORKDIR /srv
-ENTRYPOINT ["/srv/ureadability"]
+CMD ["/srv/ureadability"]
+ENTRYPOINT ["/init.sh", "/srv/ureadability"]
