@@ -1,4 +1,4 @@
-FROM nginx:1.9
+FROM nginx:1.20
 ADD nginx.conf /etc/nginx/nginx.conf
 
 ADD init.sh /init.sh

@@ -55,7 +55,7 @@ services:
       - NGINX_TEST=test:$$apr1$$5s9yoqp3$$NdZSCZr7VTmLEc8Bv/bmq1
 
   mongo:
-    image: umputun/mongo-auth
+    image: mongo:4.4
     logging:
       driver: json-file
       options:
@@ -66,6 +66,8 @@ services:
     container_name: ureadability-mongo
 
     environment:
-      - MONGO_PASSWD=Squid3kIc6Dew4ad8Ci5
+      - MONGO_INITDB_DATABASE=admin
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=Squid3kIc6Dew4ad8Ci5
     volumes:
       - /tmp/mongodb:/data/db
