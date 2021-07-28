@@ -1,4 +1,4 @@
-### ureadability api [![build](https://github.com/umputun/ukeeper-readability/actions/workflows/ci.yml/badge.svg)](https://github.com/umputun/ukeeper-readability/actions/workflows/ci.yml)
+### ureadability api [![build](https://github.com/umputun/ukeeper-redabilty/actions/workflows/ci.yml/badge.svg)](https://github.com/ukeeper/ukeeper-redabilty/actions/workflows/ci.yml)
 
 
     GET /api/content/v1/parser?token=blah&url=http://aa.com/blah - extract content (emulate Readability API parse call)
