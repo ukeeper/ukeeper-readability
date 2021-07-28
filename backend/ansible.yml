@@ -1,0 +1,12 @@
+---
+- name: deploy ureadability
+  hosts: "{{ hosts|default('all') }}"
+  user: umputun
+  gather_facts: False
+
+  tasks:
+    - name: pull docker image
+      command: docker-compose -f /srv/ureadability/docker-compose.yml pull
+
+    - name: reload
+      command: docker-compose -f /srv/ureadability/docker-compose.yml up -d
