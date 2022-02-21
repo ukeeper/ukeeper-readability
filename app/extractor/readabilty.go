@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/mauidude/go-readability"
+
 	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
-	"github.com/ukeeper/ukeeper-redabilty/app/readability"
 )
 
 // UReadability implements fetcher & extractor for local readability-like functionality
@@ -116,7 +117,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 		if err != nil {
 			return "", "", err
 		}
-		content, rich = doc.Content()
+		content, rich = doc.ContentWithHTML()
 		return content, rich, nil
 	}
 
