@@ -66,7 +66,6 @@ func (s Server) Run() {
 }
 
 func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {
-
 	artRequest := extractor.Response{}
 	if err := render.DecodeJSON(r.Body, &artRequest); err != nil {
 		render.Status(r, http.StatusInternalServerError)
@@ -202,7 +201,7 @@ func fileServer(r chi.Router, basePath string, path string, root http.FileSystem
 
 	fs := http.StripPrefix(basePath+path, http.FileServer(root))
 	if path != "/" && path[len(path)-1] != '/' {
-		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
+		r.Get(path, http.RedirectHandler(path+"/", http.StatusMovedPermanently).ServeHTTP)
 		path += "/"
 	}
 	path += "*"
@@ -217,7 +216,6 @@ func fileServer(r chi.Router, basePath string, path string, root http.FileSystem
 // otherwise, it will return a 401 and not call the next handler.
 // source: https://github.com/99designs/basicauth-go/blob/master/basicauth.go
 func basicAuth(realm string, credentials map[string]string) func(http.Handler) http.Handler {
-
 	unauthorized := func(w http.ResponseWriter, realm string) {
 		w.Header().Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, realm))
 		w.WriteHeader(http.StatusUnauthorized)
