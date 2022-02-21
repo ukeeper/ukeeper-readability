@@ -18,6 +18,7 @@ services:
       - MONGO=mongo
       - MONGO_PASSWD=Squid3kIc6Dew4ad8Ci5
       - MONGO_DELAY=10
+      - CREDS=test:$$apr1$q0x6vkft$$s9Lg0jra3GpJ3St0ogepy/
 
     ports:
       - 8080

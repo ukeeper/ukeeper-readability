@@ -1,9 +1,9 @@
+// Package extractor uses altered version of go-readabilty and local rules to get articles
 package extractor
 
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
 
 	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
@@ -26,15 +27,17 @@ type UReadability struct {
 
 // Response from api calls
 type Response struct {
-	Content   string   `json:"content"`
-	Rich      string   `json:"rich_content"`
-	Domain    string   `json:"domain"`
-	URL       string   `json:"url"`
-	Title     string   `json:"title"`
-	Excerpt   string   `json:"excerpt"`
-	Image     string   `json:"lead_image_url"`
-	AllImages []string `json:"images"`
-	AllLinks  []string `json:"links"`
+	Content     string   `json:"content"`
+	Rich        string   `json:"rich_content"`
+	Domain      string   `json:"domain"`
+	URL         string   `json:"url"`
+	Title       string   `json:"title"`
+	Excerpt     string   `json:"excerpt"`
+	Image       string   `json:"lead_image_url"`
+	AllImages   []string `json:"images"`
+	AllLinks    []string `json:"links"`
+	ContentType string   `json:"type"`
+	Charset     string   `json:"charset"`
 }
 
 var (
@@ -45,15 +48,15 @@ var (
 
 const userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
 
-// Extract fetches page and retrieve article
+// Extract fetches page and retrieves article
 func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
-	log.Printf("extract %s", reqURL)
+	log.Printf("[INFO] extract %s", reqURL)
 	rb = &Response{}
 
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		log.Printf("failed to create request for %s, error=%v", reqURL, err)
+		log.Printf("[WARN] failed to create request for %s, error=%v", reqURL, err)
 		return nil, err
 	}
 	req.Close = true
@@ -61,23 +64,24 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Printf("failed to get anyting from %s, error=%v", reqURL, err)
+		log.Printf("[WARN] failed to get anything from %s, error=%v", reqURL, err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { err = resp.Body.Close() }()
 
 	rb.URL = resp.Request.URL.String()
 	dataBytes, err := ioutil.ReadAll(resp.Body)
 
 	if err != nil {
-		log.Printf("failed to read data from %s, error=%v", reqURL, err)
+		log.Printf("[WARN] failed to read data from %s, error=%v", reqURL, err)
 		return nil, err
 	}
 
-	body := string(dataBytes)
+	var body string
+	rb.ContentType, rb.Charset, body = f.toUtf8(dataBytes, resp.Header)
 	rb.Content, rb.Rich, err = f.getContent(body, reqURL)
 	if err != nil {
-		log.Printf("failed to parse %s, error=%v", reqURL, err)
+		log.Printf("[WARN] failed to parse %s, error=%v", reqURL, err)
 		return nil, err
 	}
 
@@ -86,9 +90,9 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 		return nil, err
 	}
 
-	rb.Title = dbody.Find("title").Text()
+	rb.Title = dbody.Find("title").First().Text()
 
-	if r, err := url.Parse(rb.URL); err == nil {
+	if r, e := url.Parse(rb.URL); e == nil {
 		rb.Domain = r.Host
 	}
 
@@ -97,7 +101,7 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 	rb.Excerpt = f.getSnippet(rb.Content)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
 	if err != nil {
-		log.Printf("failed to create document from reader, error=%v", err)
+		log.Printf("[WARN] failed to create document from reader, error=%v", err)
 		return nil, err
 	}
 	if im, allImages, ok := f.extractPics(darticle.Find("img"), reqURL); ok {
@@ -105,14 +109,14 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 		rb.AllImages = allImages
 	}
 
-	log.Printf("completed for %s, url=%s", rb.Title, rb.URL)
+	log.Printf("[INFO] completed for %s, url=%s", rb.Title, rb.URL)
 	return rb, nil
 }
 
-// gets content from raw body string
-func (f UReadability) getContent(body string, reqURL string) (content string, rich string, err error) {
+// gets content from raw body string, both content (text only) and rich (with html tags)
+func (f UReadability) getContent(body, reqURL string) (content, rich string, err error) {
 	// general parser
-	genParser := func(body string) (content string, rich string, err error) {
+	genParser := func(body, _ string) (content, rich string, err error) {
 		doc, err := readability.NewDocument(body)
 		if err != nil {
 			return "", "", err
@@ -122,8 +126,8 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 	}
 
 	// custom rules parser
-	customParser := func(body string, reqURL string, rule datastore.Rule) (content string, rich string, err error) {
-		log.Printf("custom extractor for %s", reqURL)
+	customParser := func(body, reqURL string, rule datastore.Rule) (content, rich string, err error) {
+		log.Printf("[DEBUG] custom extractor for %s", reqURL)
 		dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
 		if err != nil {
 			return "", "", err
@@ -137,6 +141,7 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 		if res == "" {
 			return "", "", fmt.Errorf("nothing extracted from %s, rule=%v", reqURL, rule)
 		}
+		log.Printf("[INFO] custom rule processed for %s", reqURL)
 		return f.getText(res, ""), res, nil
 	}
 
@@ -146,13 +151,13 @@ func (f UReadability) getContent(body string, reqURL string) (content string, ri
 			if content, rich, err = customParser(body, reqURL, rule); err == nil {
 				return content, rich, err
 			}
-			log.Printf("custom extractor failed for %s, error=%v", reqURL, err) // back to general parser
+			log.Printf("[WARN] custom extractor failed for %s, error=%v", reqURL, err) // back to general parser
 		}
 	} else {
-		log.Printf("no rules defined!")
+		log.Printf("[DEBUG] no rules defined!")
 	}
 
-	return genParser(body)
+	return genParser(body, reqURL)
 }
 
 // makes all links absolute and returns all found links
@@ -172,18 +177,18 @@ func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (res
 		dstLink := srcLink
 		if absLink, changed := absoluteLink(srcLink); changed {
 			dstLink = absLink
-			srcLink := fmt.Sprintf(`"%s"`, srcLink)
+			srcLink = fmt.Sprintf(`"%s"`, srcLink)
 			absLink = fmt.Sprintf(`"%s"`, absLink)
 			result = strings.ReplaceAll(result, srcLink, absLink)
 			if f.Debug {
-				log.Printf("normlized %s -> %s", srcLink, dstLink)
+				log.Printf("[DEBUG] normalized %s -> %s", srcLink, dstLink)
 			}
 			normalizedCount++
 		}
 		links = append(links, dstLink)
 	}
 	if f.Debug {
-		log.Printf("normalized %d links", normalizedCount)
+		log.Printf("[DEBUG] normalized %d links", normalizedCount)
 	}
 	return result, links
 }

@@ -1,16 +1,15 @@
 package datastore
 
-// RulesDAO access methods to articles from/to mongo
 import (
 	"fmt"
-	"log"
 	"net/url"
 
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo"
+	"github.com/globalsign/mgo/bson"
+	log "github.com/go-pkgz/lgr"
 )
 
-// Rules interface
+// Rules interface with all methods to access datastore
 type Rules interface {
 	Get(rURL string) (Rule, bool)
 	GetByID(id bson.ObjectId) (Rule, bool)
@@ -42,20 +41,20 @@ type Rule struct {
 func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	u, err := url.Parse(rURL)
 	if err != nil {
-		log.Printf("failed to parse url=%s, error=%v", rURL, err)
+		log.Printf("[WARN] failed to parse url=%s, error=%v", rURL, err)
 		return Rule{}, false
 	}
 
 	var rules []Rule
 	q := bson.M{"domain": u.Host, "enabled": true}
-	log.Printf("query %v", q)
+	log.Printf("[DEBUG] query %v", q)
 	err = r.Collection.Find(q).All(&rules)
 	if err != nil || len(rules) == 0 {
-		log.Printf("no custom rule for %s", rURL)
+		log.Printf("[DEBUG] no custom rule for %s", rURL)
 		return Rule{}, false
 	}
 	result := rules[0]
-	log.Printf("found rule for %s = [%v]", rURL, result)
+	log.Printf("[INFO] found rule for %s = [%v]", rURL, result)
 	return result, true
 }
 
@@ -66,11 +65,11 @@ func (r RulesDAO) GetByID(id bson.ObjectId) (Rule, bool) {
 	return rule, err == nil
 }
 
-// Save upsert rule and returns one with ID for interested one only
+// Save upsert rule and returns one with ID for inserted one only
 func (r RulesDAO) Save(rule Rule) (Rule, error) {
 	ch, err := r.Collection.Upsert(bson.M{"domain": rule.Domain}, rule)
 	if err != nil {
-		log.Printf("failed to save, error=%v, article=%v", err, rule)
+		log.Printf("[WARN] failed to save, error=%v, article=%v", err, rule)
 		return rule, err
 	}
 	if ch.UpsertedId != nil {

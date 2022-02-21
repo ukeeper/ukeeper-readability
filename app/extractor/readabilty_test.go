@@ -8,12 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/mgo.v2/bson"
+	"github.com/globalsign/mgo/bson"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestExtractURL(t *testing.T) {
@@ -45,14 +43,13 @@ func TestExtractGeneral(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "UWP - Выпуск 369", a.Title)
 	assert.Equal(t, "https://podcast.umputun.com/p/2015/11/22/podcast-369/", a.URL)
-	assert.Equal(t, "UWP - Выпуск 369 22-11-2015 | Comments Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по ...", a.Excerpt)
+	assert.Equal(t, "2015-11-22 Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по будкам …Отбиваюсь от опасных ...", a.Excerpt)
 	assert.Equal(t, "https://podcast.umputun.com/images/uwp/uwp369.jpg", a.Image)
 	assert.Equal(t, "podcast.umputun.com", a.Domain)
-	require.Equal(t, 10, len(a.AllLinks))
-	assert.Equal(t, "https://podcast.umputun.com/p/2015/11/22/podcast-369/#disqus_thread", a.AllLinks[0])
-	assert.Equal(t, "https://podcast.umputun.com/images/uwp/uwp369.jpg", a.AllLinks[1])
+	assert.Equal(t, 12, len(a.AllLinks))
+	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/media/ump_podcast369.mp3")
+	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/images/uwp/uwp369.jpg")
 	log.Printf("links=%v", a.AllLinks)
-
 }
 
 func TestNormalizeLinks(t *testing.T) {

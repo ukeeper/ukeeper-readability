@@ -15,9 +15,9 @@ func TestExtractPics(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "https://p.umputun.com/images/posts/n891a_20150925_023343-minwz.png#floatright", a.Image)
 	assert.Equal(t, 3, len(a.AllImages))
-	assert.Equal(t, "https://p.umputun.com/images/posts/n891a_20150925_023343-minwz.png#floatright", a.AllImages[0])
-	assert.Equal(t, "https://p.umputun.com/images/posts/ios9nav-heavytraffic-6c-1.jpg#floatleft", a.AllImages[1])
-	assert.Equal(t, "https://p.umputun.com/images/posts/apple-maps-app-220-100.jpg#floatright", a.AllImages[2])
+	assert.Contains(t, a.AllImages, "https://p.umputun.com/images/posts/n891a_20150925_023343-minwz.png#floatright")
+	assert.Contains(t, a.AllImages, "https://p.umputun.com/images/posts/ios9nav-heavytraffic-6c-1.jpg#floatleft")
+	assert.Contains(t, a.AllImages, "https://p.umputun.com/images/posts/apple-maps-app-220-100.jpg#floatright")
 }
 
 func TestExtractPicsDirectly(t *testing.T) {

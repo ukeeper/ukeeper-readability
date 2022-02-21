@@ -1,150 +1,189 @@
+// Package rest implement http server with API
 package rest
 
 import (
-	"log"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
-	"gopkg.in/mgo.v2/bson"
+	"github.com/didip/tollbooth/v6"
+	"github.com/didip/tollbooth_chi"
+	"github.com/globalsign/mgo/bson"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/render"
+	log "github.com/go-pkgz/lgr"
+	UM "github.com/go-pkgz/rest"
+	"github.com/go-pkgz/rest/logger"
 
-	"github.com/gin-gonic/gin"
 	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
 	"github.com/ukeeper/ukeeper-redabilty/app/extractor"
 )
 
-// Server basic rest server to access msgs from mongo
+// Server is a basic rest server providing access to store and invoking parser
 type Server struct {
 	Readability extractor.UReadability
+	Version     string
+	Credentials map[string]string
 }
+
+// JSON is a map alias, just for convenience
+type JSON map[string]interface{}
 
 // Run the lister and request's router, activate rest server
-func (r Server) Run() {
-	log.Printf("activate rest server")
+func (s Server) Run() {
+	log.Printf("[INFO] activate rest server")
 
-	gin.SetMode(gin.ReleaseMode)
-	router := gin.New()
-	router.Use(gin.Recovery())
-	router.Use(func(c *gin.Context) {
-		t := time.Now()
-		c.Next()
-		log.Printf("%s %s %s %v %d", c.Request.Method, c.Request.URL.Path, c.ClientIP(), time.Since(t), c.Writer.Status())
+	router := chi.NewRouter()
+
+	router.Use(middleware.RequestID, middleware.RealIP, UM.Recoverer(log.Default()))
+	router.Use(middleware.Throttle(1000), middleware.Timeout(60*time.Second))
+	router.Use(UM.AppInfo("ureadability", "Umputun", s.Version), UM.Ping)
+	router.Use(tollbooth_chi.LimitHandler(tollbooth.NewLimiter(50, nil)))
+
+	router.Use(logger.New(logger.Log(log.Default()), logger.WithBody, logger.Prefix("[INFO]")).Handler)
+
+	router.Route("/api", func(r chi.Router) {
+		r.Get("/content/v1/parser", s.extractArticleEmulateReadability)
+		r.Post("/extract", s.extractArticle)
+
+		r.Get("/rule", s.GetRule)
+		r.Get("/rule/{id}", s.GetRuleByID)
+		r.Get("/rules", s.GetAllRules)
+		r.Post("/auth", s.AuthFake)
+
+		r.Group(func(protected chi.Router) {
+			basicAuth("ureadability", s.Credentials)
+			protected.Post("/rule", s.SaveRule)
+			protected.Delete("/rule/{id}", s.DeleteRule)
+		})
 	})
 
-	router.POST("/api/v1/extract", r.extractArticle)
-	router.GET("/api/content/v1/parser", r.extractArticleEmulateReadability)
+	fileServer(router, "", "/", http.Dir("/srv/web"))
 
-	router.POST("/api/v1/rule", r.SaveRule)
-	router.DELETE("/api/v1/rule/:id", r.DeleteRule)
-	router.GET("/api/v1/rule", r.GetRule)
-	router.GET("/api/v1/rule/:id", r.GetRuleByID)
-	router.GET("/api/v1/rules", r.GetAllRules)
-	router.POST("/api/v1/auth", r.AuthFake)
-
-	log.Fatal(router.Run(":8080"))
+	log.Fatalf("server terminated, %v", http.ListenAndServe(":8080", router))
 }
 
-func (r Server) extractArticle(c *gin.Context) {
+func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {
+
 	artRequest := extractor.Response{}
-
-	err := c.BindJSON(&artRequest)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := render.DecodeJSON(r.Body, &artRequest); err != nil {
+		render.Status(r, http.StatusInternalServerError)
+		render.JSON(w, r, JSON{"error": err.Error()})
 		return
 	}
 
-	res, err := r.Readability.Extract(artRequest.URL)
+	res, err := s.Readability.Extract(artRequest.URL)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, res)
+
+	render.JSON(w, r, &res)
 }
 
 // emulate readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
-func (r Server) extractArticleEmulateReadability(c *gin.Context) {
-	token := c.Query("token")
+func (s Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
 	if token == "" {
-		c.JSON(http.StatusExpectationFailed, gin.H{"error": "no token passed"})
+		render.Status(r, http.StatusExpectationFailed)
+		render.JSON(w, r, JSON{"error": "no token passed"})
 		return
 	}
-	url := c.Query("url")
+
+	url := r.URL.Query().Get("url")
 	if url == "" {
-		c.JSON(http.StatusExpectationFailed, gin.H{"error": "no url passed"})
+		render.Status(r, http.StatusExpectationFailed)
+		render.JSON(w, r, JSON{"error": "no url passed"})
 		return
 	}
-	res, err := r.Readability.Extract(url)
+
+	res, err := s.Readability.Extract(url)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, res)
+
+	render.JSON(w, r, &res)
 }
 
 // GetRule find rule matching url param (domain portion only)
-func (r Server) GetRule(c *gin.Context) {
-	url := c.Query("url")
+func (s Server) GetRule(w http.ResponseWriter, r *http.Request) {
+	url := r.URL.Query().Get("url")
 	if url == "" {
-		c.JSON(http.StatusExpectationFailed, gin.H{"error": "no url passed"})
+		render.Status(r, http.StatusExpectationFailed)
+		render.JSON(w, r, JSON{"error": "no url passed"})
 		return
 	}
 
-	if rule, found := r.Readability.Rules.Get(url); found {
-		log.Printf("rule for %s found, %v", url, rule)
-		c.JSON(http.StatusOK, rule)
+	rule, found := s.Readability.Rules.Get(url)
+	if !found {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": "not found"})
 		return
 	}
-	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
+
+	log.Printf("[DEBUG] rule for %s found, %v", url, rule)
+	render.JSON(w, r, rule)
 }
 
-// GetRuleByID returns rule by id
-func (r Server) GetRuleByID(c *gin.Context) {
-	id := getBid(c.Param("id"))
-	if rule, found := r.Readability.Rules.GetByID(id); found {
-		log.Printf("rule for %s found, %v", id.Hex(), rule)
-		c.JSON(http.StatusOK, rule)
+// GetRuleByID returns rule by id - GET /rule/:id"
+func (s Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
+	id := getBid(chi.URLParam(r, "id"))
+	rule, found := s.Readability.Rules.GetByID(id)
+	if !found {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": "not found"})
 		return
 	}
-	c.JSON(http.StatusBadRequest, gin.H{"error": "not found"})
+	log.Printf("[DEBUG] rule for %s found, %v", id.Hex(), rule)
+	render.JSON(w, r, &rule)
 }
 
 // GetAllRules returns list of all rules, including disabled
-func (r Server) GetAllRules(c *gin.Context) {
-	c.JSON(http.StatusOK, r.Readability.Rules.All())
+func (s Server) GetAllRules(w http.ResponseWriter, r *http.Request) {
+	render.JSON(w, r, s.Readability.Rules.All())
 }
 
 // SaveRule upsert rule, forcing enabled=true
-func (r Server) SaveRule(c *gin.Context) {
+func (s Server) SaveRule(w http.ResponseWriter, r *http.Request) {
 	rule := datastore.Rule{}
-	err := c.BindJSON(&rule)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+	if err := render.DecodeJSON(r.Body, &rule); err != nil {
+		render.Status(r, http.StatusInternalServerError)
+		render.JSON(w, r, JSON{"error": err.Error()})
 		return
 	}
+
 	rule.Enabled = true
-	sRule, err := r.Readability.Rules.Save(rule)
+	srule, err := s.Readability.Rules.Save(rule)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, sRule)
+	render.JSON(w, r, &srule)
 }
 
 // DeleteRule marks rule as disabled
-func (r Server) DeleteRule(c *gin.Context) {
-	id := getBid(c.Param("id"))
-	err := r.Readability.Rules.Disable(id)
+func (s Server) DeleteRule(w http.ResponseWriter, r *http.Request) {
+	id := getBid(chi.URLParam(r, "id"))
+	err := s.Readability.Rules.Disable(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": err.Error()})
 		return
 	}
-	// TODO: here is a typo, should be "disabled"
-	c.JSON(http.StatusOK, gin.H{"disbled": id})
+	render.JSON(w, r, JSON{"disabled": id})
 }
 
 // AuthFake just a dummy post request used for external check for protected resource
-func (r Server) AuthFake(c *gin.Context) {
+func (s Server) AuthFake(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
-	c.JSON(http.StatusOK, gin.H{"pong": t.Format("20060102150405")})
+	render.JSON(w, r, JSON{"pong": t.Format("20060102150405")})
 }
 
 func getBid(id string) bson.ObjectId {
@@ -153,4 +192,55 @@ func getBid(id string) bson.ObjectId {
 		bid = bson.ObjectIdHex(id)
 	}
 	return bid
+}
+
+// serves static files from /web
+func fileServer(r chi.Router, basePath string, path string, root http.FileSystem) {
+	if strings.ContainsAny(path, "{}*") {
+		panic("FileServer does not permit URL parameters.")
+	}
+
+	fs := http.StripPrefix(basePath+path, http.FileServer(root))
+	if path != "/" && path[len(path)-1] != '/' {
+		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
+		path += "/"
+	}
+	path += "*"
+
+	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
+		fs.ServeHTTP(w, r)
+	})
+}
+
+// basicAuth returns a piece of middleware that will allow access only
+// if the provided credentials match within the given service
+// otherwise, it will return a 401 and not call the next handler.
+// source: https://github.com/99designs/basicauth-go/blob/master/basicauth.go
+func basicAuth(realm string, credentials map[string]string) func(http.Handler) http.Handler {
+
+	unauthorized := func(w http.ResponseWriter, realm string) {
+		w.Header().Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, realm))
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			username, password, ok := r.BasicAuth()
+			if !ok {
+				unauthorized(w, realm)
+				return
+			}
+
+			validPassword, userFound := credentials[username]
+			if !userFound {
+				unauthorized(w, realm)
+				return
+			}
+			if password != validPassword {
+				unauthorized(w, realm)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

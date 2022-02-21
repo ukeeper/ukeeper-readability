@@ -55,7 +55,9 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 
 			if len(ignore) == 0 && includes(allowedTags, token.Data) {
 				token.Attr = cleanAttributes(token.Attr, allowedAttributes)
-				buffer.WriteString(token.String())
+				if _, err := buffer.WriteString(token.String()); err != nil {
+					return "", err
+				}
 			} else if includes(ignoreTags, token.Data) {
 				ignore = token.Data
 			}
@@ -64,7 +66,9 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 
 			if len(ignore) == 0 && includes(allowedTags, token.Data) {
 				token.Attr = cleanAttributes(token.Attr, allowedAttributes)
-				buffer.WriteString(token.String())
+				if _, err := buffer.WriteString(token.String()); err != nil {
+					return "", err
+				}
 			} else if token.Data == ignore {
 				ignore = ""
 			}
@@ -72,7 +76,9 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 		case parser.EndTagToken:
 			if len(ignore) == 0 && includes(allowedTags, token.Data) {
 				token.Attr = []parser.Attribute{}
-				buffer.WriteString(token.String())
+				if _, err := buffer.WriteString(token.String()); err != nil {
+					return "", err
+				}
 			} else if token.Data == ignore {
 				ignore = ""
 			}
@@ -80,7 +86,9 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 		case parser.TextToken:
 			// We allow text content through, unless ignoring this entire tag and its contents (including other tags)
 			if ignore == "" {
-				buffer.WriteString(token.String())
+				if _, err := buffer.WriteString(token.String()); err != nil {
+					return "", err
+				}
 			}
 		case parser.CommentToken:
 			// We ignore comments by default
@@ -95,7 +103,7 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 // HTML strips html tags, replace common entities, and escapes <>&;'" in the result.
 // Note the returned text may contain entities as it is escaped by HTMLEscapeString, and most entities are not translated.
 func HTML(s string) string {
-	output := ""
+	var output string
 
 	// Shortcut strings with no tags in them
 	if !strings.ContainsAny(s, "<>") {
