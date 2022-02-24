@@ -1,7 +1,7 @@
 version: '2'
 services:
   server:
-    build: app
+    build: umputun/ureadability:latest
     logging:
       driver: json-file
       options:
