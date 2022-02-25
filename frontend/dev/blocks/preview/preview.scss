@@ -1,0 +1,35 @@
+@import '../link/link';
+
+$b: '.preview';
+
+#{$b} {
+	display: none;
+	max-width: 90%;
+	
+	&__tip {
+		color: #333;
+		font-size: 16px;
+	}
+
+	&__data {
+		padding: 7px 10px;
+		margin: 7px -10px 25px;
+		
+		background: #eee;
+		border-radius: 3px;
+		
+		font-size: 16px;
+		
+		a {
+			@extend .link;
+		}
+
+		img {
+			max-width: 100%;
+		}
+
+		pre {
+			white-space: pre-wrap;
+		}
+	}
+}

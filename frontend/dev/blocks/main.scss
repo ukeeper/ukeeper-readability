@@ -1,0 +1,51 @@
+/* vars */
+$serif: "PT Serif", Georgia, sans-serif;;
+
+/* common blocks */
+@import 'wrapper/wrapper';
+@import 'row/row';
+@import 'link/link';
+@import 'form/form';
+
+/* main blocks */
+@import 'menu/menu';
+@import 'page/page';
+@import 'header/header';
+@import 'footer/footer';
+@import 'login/login';
+@import 'rules/rules';
+@import 'rule/rule';
+@import 'preview/preview';
+
+/* fonts */
+@import '../fonts/pt-sans/pt-sans';
+@import '../fonts/pt-serif/pt-serif';
+
+/* fixes */
+
+html, body {
+	height: 100%;
+	margin: 0;
+    padding: 0;  
+}
+
+input, textarea {
+	&:focus {
+		&::placeholder {
+	    	color: transparent;
+		}
+	}
+}
+
+input, textarea {
+	font-family: inherit;
+}
+
+/* ie 9 fixes */
+img {
+	border: 0;
+} 
+
+textarea {
+	overflow: auto;
+}
