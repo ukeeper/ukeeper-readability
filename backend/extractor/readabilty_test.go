@@ -11,7 +11,7 @@ import (
 	"github.com/globalsign/mgo/bson"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 )
 
 func TestExtractURL(t *testing.T) {

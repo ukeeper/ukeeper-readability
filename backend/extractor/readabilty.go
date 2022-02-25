@@ -14,7 +14,7 @@ import (
 	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
 
-	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 )
 
 // UReadability implements fetcher & extractor for local readability-like functionality

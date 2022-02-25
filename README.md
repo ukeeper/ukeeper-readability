@@ -8,11 +8,9 @@
     GET /api/v1/rule?url=http://blah.com/aaa - get rule for url
     GET /api/v1/rules - get all rules, enabled and disabled
 
-
 #### testing
 
 on master (dev version) prefix /ureadability should be added
-
 
     http POST "master.radio-t.com:8780/ureadability/api/v1/rule" domain=blah.ukeeper.com content="#content p" enabled:=true
     HTTP/1.1 200 OK

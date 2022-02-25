@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: build and test
-        working-directory: app
+        working-directory: backend
         run: |
           go test -timeout=60s -race -covermode=atomic -coverprofile=$GITHUB_WORKSPACE/profile.cov ./...
           go build -race
@@ -33,10 +33,10 @@ jobs:
           curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $GITHUB_WORKSPACE v1.41.1
           GO111MODULE=off go get -u -v github.com/mattn/goveralls
       - name: run linters
-        working-directory: app
+        working-directory: backend
         run: $GITHUB_WORKSPACE/golangci-lint run --out-format=github-actions
 
-#      TODO: enable when repo will be enabled in coveralls
+#      enable if repo will be enabled in coveralls
 #      - name: submit coverage
 #        run: $(go env GOPATH)/bin/goveralls -service="github" -coverprofile=$GITHUB_WORKSPACE/profile.cov
 #        env:

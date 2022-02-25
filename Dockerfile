@@ -1,5 +1,5 @@
 # Build
-FROM umputun/baseimage:buildgo-latest as build
+FROM umputun/baseimage:buildgo-latest as build-backend
 
 ARG CI
 ARG GITHUB_REF
@@ -8,7 +8,7 @@ ARG GIT_BRANCH
 ARG SKIP_TEST
 
 ADD . /build
-WORKDIR /build/app
+WORKDIR /build/backend
 
 # run tests and linters
 RUN \
@@ -27,7 +27,7 @@ FROM umputun/baseimage:app-latest
 
 RUN apk add --update ca-certificates && update-ca-certificates
 
-COPY --from=build /build/app/ukeeper-readability /srv/
+COPY --from=build-backend /build/backend/ukeeper-readability /srv/
 
 RUN chown -R app:app /srv
 USER app

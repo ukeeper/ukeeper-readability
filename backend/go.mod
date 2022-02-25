@@ -1,4 +1,4 @@
-module github.com/ukeeper/ukeeper-redabilty/app
+module github.com/ukeeper/ukeeper-redabilty/backend
 
 go 1.17
 

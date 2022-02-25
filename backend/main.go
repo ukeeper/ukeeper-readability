@@ -6,9 +6,9 @@ import (
 	log "github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
 
-	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
-	"github.com/ukeeper/ukeeper-redabilty/app/extractor"
-	"github.com/ukeeper/ukeeper-redabilty/app/rest"
+	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/backend/extractor"
+	"github.com/ukeeper/ukeeper-redabilty/backend/rest"
 )
 
 var revision string

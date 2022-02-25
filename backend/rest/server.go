@@ -17,8 +17,8 @@ import (
 	UM "github.com/go-pkgz/rest"
 	"github.com/go-pkgz/rest/logger"
 
-	"github.com/ukeeper/ukeeper-redabilty/app/datastore"
-	"github.com/ukeeper/ukeeper-redabilty/app/extractor"
+	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
+	"github.com/ukeeper/ukeeper-redabilty/backend/extractor"
 )
 
 // Server is a basic rest server providing access to store and invoking parser

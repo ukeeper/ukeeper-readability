@@ -1,7 +1,8 @@
 version: '2'
 services:
-  server:
-    build: umputun/ureadability:latest
+  ureadability:
+    build: .
+    image: umputun/ureadability:latest
     logging:
       driver: json-file
       options:
@@ -21,7 +22,7 @@ services:
       - CREDS=test:$$apr1$q0x6vkft$$s9Lg0jra3GpJ3St0ogepy/
 
     ports:
-      - 8080
+      - "8080"
 
   webapp:
     image: igoradamenko/ureadability-ui
