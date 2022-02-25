@@ -1,4 +1,4 @@
-var APIPath = 'http://master.radio-t.com:8780/ureadability/api/v1',
+var APIPath = '/api',
 	login = localStorage.getItem('login'),
 	password = localStorage.getItem('password'),
 	authHeaders = {

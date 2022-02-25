@@ -22,18 +22,15 @@ RUN \
     echo "version=$version" && \
     go build -o ukeeper-readability -ldflags "-X main.revision=${version} -s -w" .
 
-FROM node:4.9.1 as build-frontend
-
-ENV APIPATH=/api
+FROM node:6.17.1 as build-frontend
 
 ADD frontend /build
 WORKDIR /build
 
 RUN \
-#	npm i --quiet -g gulp && \
-#	npm i --quiet && \
-#	gulp build && \
-	sed -i 's|http://master.radio-t.com:8780/ureadability/api/v1|'"$APIPATH"'|g' public/js/main.js
+	npm i --quiet -g gulp && \
+	npm i --quiet && \
+	gulp build
 
 # Run
 FROM umputun/baseimage:app-latest
