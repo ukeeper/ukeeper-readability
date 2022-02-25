@@ -4,7 +4,6 @@ package rest
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/didip/tollbooth/v6"
@@ -60,7 +59,13 @@ func (s Server) Run() {
 		})
 	})
 
-	fileServer(router, "", "/", http.Dir("/srv/web"))
+	fs, err := UM.NewFileServer("/", "/srv/web", UM.FsOptSPA)
+	if err != nil {
+		log.Fatalf("unable to create, %v", err)
+	}
+	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		fs.ServeHTTP(w, r)
+	})
 
 	log.Fatalf("server terminated, %v", http.ListenAndServe(":8080", router))
 }
@@ -191,24 +196,6 @@ func getBid(id string) bson.ObjectId {
 		bid = bson.ObjectIdHex(id)
 	}
 	return bid
-}
-
-// serves static files from /web
-func fileServer(r chi.Router, basePath string, path string, root http.FileSystem) {
-	if strings.ContainsAny(path, "{}*") {
-		panic("FileServer does not permit URL parameters.")
-	}
-
-	fs := http.StripPrefix(basePath+path, http.FileServer(root))
-	if path != "/" && path[len(path)-1] != '/' {
-		r.Get(path, http.RedirectHandler(path+"/", http.StatusMovedPermanently).ServeHTTP)
-		path += "/"
-	}
-	path += "*"
-
-	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
-		fs.ServeHTTP(w, r)
-	})
 }
 
 // basicAuth returns a piece of middleware that will allow access only
