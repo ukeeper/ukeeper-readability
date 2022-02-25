@@ -30,9 +30,9 @@ ADD frontend /build
 WORKDIR /build
 
 RUN \
-	npm i --quiet -g gulp && \
-	npm i --quiet && \
-	gulp build && \
+#	npm i --quiet -g gulp && \
+#	npm i --quiet && \
+#	gulp build && \
 	sed -i 's|http://master.radio-t.com:8780/ureadability/api/v1|'"$APIPATH"'|g' public/js/main.js
 
 # Run
