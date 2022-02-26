@@ -2,6 +2,7 @@
 package extractor
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -49,12 +50,12 @@ var (
 const userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
 
 // Extract fetches page and retrieves article
-func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
+func (f UReadability) Extract(ctx context.Context, reqURL string) (rb *Response, err error) {
 	log.Printf("[INFO] extract %s", reqURL)
 	rb = &Response{}
 
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		log.Printf("[WARN] failed to create request for %s, error=%v", reqURL, err)
 		return nil, err
@@ -67,7 +68,11 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 		log.Printf("[WARN] failed to get anything from %s, error=%v", reqURL, err)
 		return nil, err
 	}
-	defer func() { err = resp.Body.Close() }()
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Printf("[WARN] failed to close response body, error=%v", err)
+		}
+	}()
 
 	rb.URL = resp.Request.URL.String()
 	dataBytes, err := ioutil.ReadAll(resp.Body)
@@ -79,7 +84,7 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 
 	var body string
 	rb.ContentType, rb.Charset, body = f.toUtf8(dataBytes, resp.Header)
-	rb.Content, rb.Rich, err = f.getContent(body, reqURL)
+	rb.Content, rb.Rich, err = f.getContent(ctx, body, reqURL)
 	if err != nil {
 		log.Printf("[WARN] failed to parse %s, error=%v", reqURL, err)
 		return nil, err
@@ -114,7 +119,7 @@ func (f UReadability) Extract(reqURL string) (rb *Response, err error) {
 }
 
 // gets content from raw body string, both content (text only) and rich (with html tags)
-func (f UReadability) getContent(body, reqURL string) (content, rich string, err error) {
+func (f UReadability) getContent(ctx context.Context, body, reqURL string) (content, rich string, err error) {
 	// general parser
 	genParser := func(body, _ string) (content, rich string, err error) {
 		doc, err := readability.NewDocument(body)
@@ -147,7 +152,7 @@ func (f UReadability) getContent(body, reqURL string) (content, rich string, err
 
 	if f.Rules != nil {
 		r := f.Rules
-		if rule, found := r.Get(reqURL); found {
+		if rule, found := r.Get(ctx, reqURL); found {
 			if content, rich, err = customParser(body, reqURL, rule); err == nil {
 				return content, rich, err
 			}

@@ -14,11 +14,11 @@ import (
 
 // Rules interface with all methods to access datastore
 type Rules interface {
-	Get(rURL string) (Rule, bool)
-	GetByID(id primitive.ObjectID) (Rule, bool)
-	Save(rule Rule) (Rule, error)
-	Disable(id primitive.ObjectID) error
-	All() []Rule
+	Get(ctx context.Context, rURL string) (Rule, bool)
+	GetByID(ctx context.Context, id primitive.ObjectID) (Rule, bool)
+	Save(ctx context.Context, rule Rule) (Rule, error)
+	Disable(ctx context.Context, id primitive.ObjectID) error
+	All(ctx context.Context) []Rule
 }
 
 // RulesDAO data-access obj for custom parsing rules, implements Rules
@@ -41,7 +41,7 @@ type Rule struct {
 }
 
 // Get rule by url. Checks if found in mongo, matching by domain
-func (r RulesDAO) Get(rURL string) (Rule, bool) {
+func (r RulesDAO) Get(ctx context.Context, rURL string) (Rule, bool) {
 	u, err := url.Parse(rURL)
 	if err != nil {
 		log.Printf("[WARN] failed to parse url=%s, error=%v", rURL, err)
@@ -51,12 +51,12 @@ func (r RulesDAO) Get(rURL string) (Rule, bool) {
 	var rules []Rule
 	q := bson.M{"domain": u.Host, "enabled": true}
 	log.Printf("[DEBUG] query %v", q)
-	cursor, err := r.Collection.Find(context.Background(), q)
+	cursor, err := r.Collection.Find(ctx, q)
 	if err != nil {
 		log.Printf("[DEBUG] error looking for rules for %s", rURL)
 		return Rule{}, false
 	}
-	if err := cursor.All(context.Background(), &rules); err != nil || len(rules) == 0 {
+	if err := cursor.All(ctx, &rules); err != nil || len(rules) == 0 {
 		log.Printf("[DEBUG] no custom rule for %s", rURL)
 		return Rule{}, false
 	}
@@ -66,15 +66,15 @@ func (r RulesDAO) Get(rURL string) (Rule, bool) {
 }
 
 // GetByID returns record by id
-func (r RulesDAO) GetByID(id primitive.ObjectID) (Rule, bool) {
+func (r RulesDAO) GetByID(ctx context.Context, id primitive.ObjectID) (Rule, bool) {
 	var rule Rule
-	err := r.Collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&rule)
+	err := r.Collection.FindOne(ctx, bson.M{"_id": id}).Decode(&rule)
 	return rule, err == nil
 }
 
 // Save upsert rule and returns one with ID for inserted one only
-func (r RulesDAO) Save(rule Rule) (Rule, error) {
-	ch, err := r.Collection.UpdateOne(context.Background(), bson.M{"domain": rule.Domain}, bson.M{"$set": rule}, options.Update().SetUpsert(true))
+func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
+	ch, err := r.Collection.UpdateOne(ctx, bson.M{"domain": rule.Domain}, bson.M{"$set": rule}, options.Update().SetUpsert(true))
 	if err != nil {
 		log.Printf("[WARN] failed to save, error=%v, article=%v", err, rule)
 		return rule, err
@@ -86,19 +86,19 @@ func (r RulesDAO) Save(rule Rule) (Rule, error) {
 }
 
 // Disable marks enabled=false, by id
-func (r RulesDAO) Disable(id primitive.ObjectID) error {
-	_, err := r.Collection.UpdateOne(context.Background(), bson.M{"_id": id}, bson.M{"$set": bson.M{"enabled": false}})
+func (r RulesDAO) Disable(ctx context.Context, id primitive.ObjectID) error {
+	_, err := r.Collection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"enabled": false}})
 	return err
 }
 
 // All returns list of all rules, both enabled and disabled
-func (r RulesDAO) All() []Rule {
+func (r RulesDAO) All(ctx context.Context) []Rule {
 	result := []Rule{}
-	cursor, err := r.Collection.Find(context.Background(), bson.M{})
+	cursor, err := r.Collection.Find(ctx, bson.M{})
 	if err != nil {
 		return []Rule{}
 	}
-	if err = cursor.All(context.Background(), &result); err != nil {
+	if err = cursor.All(ctx, &result); err != nil {
 		return []Rule{}
 	}
 	return result

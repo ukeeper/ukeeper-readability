@@ -1,6 +1,7 @@
 package extractor
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,14 +18,14 @@ import (
 func TestExtractURL(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	t.Log("full url")
-	rb, err := lr.Extract("https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
+	rb, err := lr.Extract(context.Background(), "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.Nil(t, err)
 	assert.Equal(t, "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "not changed")
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", rb.Title)
 	assert.Equal(t, 9665, len(rb.Content))
 
 	t.Log("short url")
-	rb, err = lr.Extract("https://goo.gl/IAvTHr")
+	rb, err = lr.Extract(context.Background(), "https://goo.gl/IAvTHr")
 	assert.Nil(t, err)
 	assert.Equal(t, "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "full url")
 	assert.Equal(t, 9665, len(rb.Content))
@@ -32,14 +33,14 @@ func TestExtractURL(t *testing.T) {
 
 func TestExtractGeneral(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
-	a, err := lr.Extract("https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
+	a, err := lr.Extract(context.Background(), "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.Nil(t, err)
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", a.Title)
 	assert.Equal(t, "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", a.URL)
 	assert.Equal(t, "Не первый раз я практикую идею “а давайте, ребята, сделаем для общего блага …”, и вот опять. В нашем подкасте радио-т есть незаменимый инструмент, позволяющий собирать новости, готовить их к выпуску, ...", a.Excerpt)
 	assert.Equal(t, "p.umputun.com", a.Domain)
 
-	a, err = lr.Extract("http://goo.gl/v48b6Q")
+	a, err = lr.Extract(context.Background(), "http://goo.gl/v48b6Q")
 	assert.Nil(t, err)
 	assert.Equal(t, "UWP - Выпуск 369", a.Title)
 	assert.Equal(t, "https://podcast.umputun.com/p/2015/11/22/podcast-369/", a.URL)
@@ -70,33 +71,35 @@ func TestNormalizeLinks(t *testing.T) {
 
 func TestNormalizeLinksIssue(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
-	_, err := lr.Extract("https://git-scm.com/book/en/v2/Git-Tools-Submodules")
+	_, err := lr.Extract(context.Background(), "https://git-scm.com/book/en/v2/Git-Tools-Submodules")
 	assert.Nil(t, err)
 }
 
 type RulesMock struct{}
 
-func (m RulesMock) Get(_ string) (datastore.Rule, bool) {
+func (m RulesMock) Get(_ context.Context, _ string) (datastore.Rule, bool) {
 	return datastore.Rule{Content: "#content p, .post-title"}, true
 }
-func (m RulesMock) GetByID(_ primitive.ObjectID) (datastore.Rule, bool) {
+func (m RulesMock) GetByID(_ context.Context, _ primitive.ObjectID) (datastore.Rule, bool) {
 	return datastore.Rule{}, false
 }
-func (m RulesMock) Save(_ datastore.Rule) (datastore.Rule, error) { return datastore.Rule{}, nil }
-func (m RulesMock) Disable(_ primitive.ObjectID) error            { return nil }
-func (m RulesMock) All() []datastore.Rule                         { return make([]datastore.Rule, 0) }
+func (m RulesMock) Save(_ context.Context, _ datastore.Rule) (datastore.Rule, error) {
+	return datastore.Rule{}, nil
+}
+func (m RulesMock) Disable(_ context.Context, _ primitive.ObjectID) error { return nil }
+func (m RulesMock) All(_ context.Context) []datastore.Rule                { return make([]datastore.Rule, 0) }
 
 func TestGetContentCustom(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}
 	httpClient := &http.Client{Timeout: time.Second * 30}
-	resp, err := httpClient.Get("http://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
+	resp, err := httpClient.Get("https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
 	assert.Nil(t, err)
 	defer resp.Body.Close()
 	dataBytes, err := ioutil.ReadAll(resp.Body)
 	assert.Nil(t, err)
 	body := string(dataBytes)
 
-	content, rich, err := lr.getContent(body, "http://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
+	content, rich, err := lr.getContent(context.Background(), body, "https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
 	assert.Nil(t, err)
 	assert.Equal(t, 6988, len(content))
 	assert.Equal(t, 7169, len(rich))

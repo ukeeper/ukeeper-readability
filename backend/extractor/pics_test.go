@@ -1,6 +1,7 @@
 package extractor
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 func TestExtractPics(t *testing.T) {
 	t.Log("test main pic")
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
-	a, err := lr.Extract("https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
+	a, err := lr.Extract(context.Background(), "https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
 	assert.Nil(t, err)
 	assert.Equal(t, "https://p.umputun.com/images/posts/n891a_20150925_023343-minwz.png#floatright", a.Image)
 	assert.Equal(t, 3, len(a.AllImages))
