@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/globalsign/mgo/bson"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 )
@@ -79,10 +79,12 @@ type RulesMock struct{}
 func (m RulesMock) Get(_ string) (datastore.Rule, bool) {
 	return datastore.Rule{Content: "#content p, .post-title"}, true
 }
-func (m RulesMock) GetByID(_ bson.ObjectId) (datastore.Rule, bool) { return datastore.Rule{}, false }
-func (m RulesMock) Save(_ datastore.Rule) (datastore.Rule, error)  { return datastore.Rule{}, nil }
-func (m RulesMock) Disable(_ bson.ObjectId) error                  { return nil }
-func (m RulesMock) All() []datastore.Rule                          { return make([]datastore.Rule, 0) }
+func (m RulesMock) GetByID(_ primitive.ObjectID) (datastore.Rule, bool) {
+	return datastore.Rule{}, false
+}
+func (m RulesMock) Save(_ datastore.Rule) (datastore.Rule, error) { return datastore.Rule{}, nil }
+func (m RulesMock) Disable(_ primitive.ObjectID) error            { return nil }
+func (m RulesMock) All() []datastore.Rule                         { return make([]datastore.Rule, 0) }
 
 func TestGetContentCustom(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}
