@@ -78,7 +78,7 @@ func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := s.Readability.Extract(artRequest.URL)
+	res, err := s.Readability.Extract(r.Context(), artRequest.URL)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, JSON{"error": err.Error()})
@@ -104,7 +104,7 @@ func (s Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.
 		return
 	}
 
-	res, err := s.Readability.Extract(url)
+	res, err := s.Readability.Extract(r.Context(), url)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, JSON{"error": err.Error()})
@@ -123,7 +123,7 @@ func (s Server) GetRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rule, found := s.Readability.Rules.Get(url)
+	rule, found := s.Readability.Rules.Get(r.Context(), url)
 	if !found {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, JSON{"error": "not found"})
@@ -137,7 +137,7 @@ func (s Server) GetRule(w http.ResponseWriter, r *http.Request) {
 // GetRuleByID returns rule by id - GET /rule/:id"
 func (s Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
 	id := getBid(chi.URLParam(r, "id"))
-	rule, found := s.Readability.Rules.GetByID(id)
+	rule, found := s.Readability.Rules.GetByID(r.Context(), id)
 	if !found {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, JSON{"error": "not found"})
@@ -149,7 +149,7 @@ func (s Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
 
 // GetAllRules returns list of all rules, including disabled
 func (s Server) GetAllRules(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, r, s.Readability.Rules.All())
+	render.JSON(w, r, s.Readability.Rules.All(r.Context()))
 }
 
 // SaveRule upsert rule, forcing enabled=true
@@ -163,7 +163,7 @@ func (s Server) SaveRule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rule.Enabled = true
-	srule, err := s.Readability.Rules.Save(rule)
+	srule, err := s.Readability.Rules.Save(r.Context(), rule)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, JSON{"error": err.Error()})
@@ -175,7 +175,7 @@ func (s Server) SaveRule(w http.ResponseWriter, r *http.Request) {
 // DeleteRule marks rule as disabled
 func (s Server) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	id := getBid(chi.URLParam(r, "id"))
-	err := s.Readability.Rules.Disable(id)
+	err := s.Readability.Rules.Disable(r.Context(), id)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, JSON{"error": err.Error()})
