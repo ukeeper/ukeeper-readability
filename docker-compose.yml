@@ -25,7 +25,7 @@ services:
       - "8080:8080"
 
   mongo:
-    image: mongo:4.4
+    image: mongo:5.0
     logging:
       driver: json-file
       options:

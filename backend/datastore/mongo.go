@@ -2,18 +2,19 @@
 package datastore
 
 import (
+	"context"
 	"time"
 
-	"github.com/globalsign/mgo"
 	log "github.com/go-pkgz/lgr"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MongoServer top level mongo ops
 type MongoServer struct {
-	address string
-	creds   *mgo.Credential
-	session *mgo.Session
-	dbName  string
+	client *mongo.Client
+	dbName string
 }
 
 // New MongoServer
@@ -28,43 +29,34 @@ func New(address, password, dbName string, delay int) (res *MongoServer) {
 	}
 
 	log.Printf("[DEBUG] get mongo for %s", address)
-	session, err := mgo.Dial(address)
+	connectString := "mongodb://root:" + password + "@" + address
+	ctx := context.Background()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(connectString))
 	if err != nil {
 		log.Fatalf("[ERROR] can't connect to mongo %v", err)
 	}
-	session.SetMode(mgo.Monotonic, true)
 
-	creds := &mgo.Credential{Username: "root", Password: password}
-	if password != "" {
-		log.Print("[DEBUG] login to mongo")
-		if err = session.Login(creds); err != nil {
-			log.Fatalf("[ERROR] can't login to mongo %v", err)
-		}
-	}
-	return &MongoServer{address: address, creds: creds, session: session, dbName: dbName}
+	return &MongoServer{client: client, dbName: dbName}
 }
 
 // GetStores initialize collections and make indexes
 func (m *MongoServer) GetStores() (rules RulesDAO) {
-	rIndexes := []mgo.Index{
-		{Key: []string{"enabled", "domain"}},
-		{Key: []string{"user", "domain", "enabled"}},
-		{Key: []string{"domain", "match_urls"}},
+	rIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "enabled", Value: 1}, {Key: "domain", Value: 1}}},
+		{Keys: bson.D{{Key: "user", Value: 1}, {Key: "domain", Value: 1}, {Key: "enabled", Value: 1}}},
+		{Keys: bson.D{{Key: "domain", Value: 1}, {Key: "match_urls", Value: 1}}},
 	}
 	rules = RulesDAO{Collection: m.collection("rules", rIndexes)}
 	return rules
 }
 
 // collection makes collection with indexes
-func (m *MongoServer) collection(collection string, indexes []mgo.Index) *mgo.Collection {
+func (m *MongoServer) collection(collection string, indexes []mongo.IndexModel) *mongo.Collection {
 	log.Printf("[INFO] create collection %s.%s", m.dbName, collection)
-	coll := m.session.DB(m.dbName).C(collection)
-	if err := coll.Create(&mgo.CollectionInfo{ForceIdIndex: true}); err != nil {
-		log.Printf("[WARN] can't create collection %s, error=%v", collection, err)
-	}
+	coll := m.client.Database(m.dbName).Collection(collection)
 
 	for _, index := range indexes {
-		if err := coll.EnsureIndex(index); err != nil {
+		if _, err := coll.Indexes().CreateOne(context.Background(), index); err != nil {
 			log.Printf("[WARN] can't ensure index=%v, error=%v", index, err)
 		}
 	}

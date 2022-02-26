@@ -8,13 +8,13 @@ import (
 
 	"github.com/didip/tollbooth/v6"
 	"github.com/didip/tollbooth_chi"
-	"github.com/globalsign/mgo/bson"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	log "github.com/go-pkgz/lgr"
 	UM "github.com/go-pkgz/rest"
 	"github.com/go-pkgz/rest/logger"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 	"github.com/ukeeper/ukeeper-redabilty/backend/extractor"
@@ -190,10 +190,10 @@ func (s Server) AuthFake(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, JSON{"pong": t.Format("20060102150405")})
 }
 
-func getBid(id string) bson.ObjectId {
-	bid := bson.ObjectId("000000000000")
-	if id != "0" && bson.IsObjectIdHex(id) {
-		bid = bson.ObjectIdHex(id)
+func getBid(id string) primitive.ObjectID {
+	bid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return primitive.NilObjectID
 	}
 	return bid
 }
