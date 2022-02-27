@@ -12,15 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Rules interface with all methods to access datastore
-type Rules interface {
-	Get(ctx context.Context, rURL string) (Rule, bool)
-	GetByID(ctx context.Context, id primitive.ObjectID) (Rule, bool)
-	Save(ctx context.Context, rule Rule) (Rule, error)
-	Disable(ctx context.Context, id primitive.ObjectID) error
-	All(ctx context.Context) []Rule
-}
-
 // RulesDAO data-access obj for custom parsing rules, implements Rules
 type RulesDAO struct {
 	*mongo.Collection
