@@ -3,6 +3,7 @@ package datastore
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	log "github.com/go-pkgz/lgr"
@@ -18,25 +19,22 @@ type MongoServer struct {
 }
 
 // New MongoServer
-func New(address, password, dbName string, delay int) (res *MongoServer) {
-	log.Printf("[INFO] make new mongo server with ip=%s, db=%s, delay=%dsecs", address, dbName, delay)
+func New(connectionURI, dbName string, delay time.Duration) (*MongoServer, error) {
+	log.Printf("[INFO] connect to mongo server with db=%s, delay=%s", dbName, delay)
 	if delay > 0 {
 		log.Printf("[DEBUG] initial mongo delay=%d", delay)
-		time.Sleep(time.Duration(delay) * time.Second)
+		time.Sleep(delay)
 	}
-	if address == "" {
-		log.Fatalf("[ERROR] env MONGO not defined and --mongo not passed")
+	if connectionURI == "" {
+		return nil, errors.New("env MONGO_URI not defined and --mongo not passed")
 	}
 
-	log.Printf("[DEBUG] get mongo for %s", address)
-	connectString := "mongodb://root:" + password + "@" + address
-	ctx := context.Background()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(connectString))
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(connectionURI))
 	if err != nil {
-		log.Fatalf("[ERROR] can't connect to mongo %v", err)
+		return nil, err
 	}
 
-	return &MongoServer{client: client, dbName: dbName}
+	return &MongoServer{client: client, dbName: dbName}, nil
 }
 
 // GetStores initialize collections and make indexes
@@ -55,10 +53,8 @@ func (m *MongoServer) collection(collection string, indexes []mongo.IndexModel) 
 	log.Printf("[INFO] create collection %s.%s", m.dbName, collection)
 	coll := m.client.Database(m.dbName).Collection(collection)
 
-	for _, index := range indexes {
-		if _, err := coll.Indexes().CreateOne(context.Background(), index); err != nil {
-			log.Printf("[WARN] can't ensure index=%v, error=%v", index, err)
-		}
+	if _, err := coll.Indexes().CreateMany(context.Background(), indexes); err != nil {
+		log.Printf("[WARN] can't ensure indexes=%v, error=%v", indexes, err)
 	}
 	return coll
 }

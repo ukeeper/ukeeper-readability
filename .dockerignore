@@ -1,0 +1,7 @@
+/.idea/
+/.github/
+
+# source files
+docker-compose.yml
+README.md
+

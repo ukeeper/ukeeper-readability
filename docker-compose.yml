@@ -16,9 +16,8 @@ services:
       - mongo
 
     environment:
-      - MONGO=mongo
-      - MONGO_PASSWD=Squid3kIc6Dew4ad8Ci5
-      - MONGO_DELAY=10
+      - MONGO_URI=mongodb://root:Squid3kIc6Dew4ad8Ci5@mongo
+      - MONGO_DELAY=10s
       - CREDS=test:l4!AzQVW1dSN0T^7IJGn&Kr!kwRSF2P1
 
     ports:
