@@ -87,9 +87,11 @@ func (r RulesDAO) All(ctx context.Context) []Rule {
 	result := []Rule{}
 	cursor, err := r.Collection.Find(ctx, bson.M{})
 	if err != nil {
+		log.Printf("[WARN] failed to retrieve all rules, error=%v", err)
 		return []Rule{}
 	}
 	if err = cursor.All(ctx, &result); err != nil {
+		log.Printf("[WARN] failed to retrieve all rules, error=%v", err)
 		return []Rule{}
 	}
 	return result
