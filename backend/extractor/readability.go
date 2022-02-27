@@ -14,16 +14,26 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 )
+
+// Rules interface with all methods to access datastore
+type Rules interface {
+	Get(ctx context.Context, rURL string) (datastore.Rule, bool)
+	GetByID(ctx context.Context, id primitive.ObjectID) (datastore.Rule, bool)
+	Save(ctx context.Context, rule datastore.Rule) (datastore.Rule, error)
+	Disable(ctx context.Context, id primitive.ObjectID) error
+	All(ctx context.Context) []datastore.Rule
+}
 
 // UReadability implements fetcher & extractor for local readability-like functionality
 type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Debug       bool
-	Rules       datastore.Rules
+	Rules       Rules
 }
 
 // Response from api calls
