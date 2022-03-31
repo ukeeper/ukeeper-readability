@@ -2,10 +2,13 @@ package extractor
 
 import (
 	"context"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -16,37 +19,80 @@ import (
 )
 
 func TestExtractURL(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() == "/IAvTHr" {
+			http.Redirect(w, r, "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", http.StatusFound)
+			return
+		}
+		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
+			fh, err := os.Open("testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			testHTML, err := io.ReadAll(fh)
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
+			_, err = w.Write(testHTML)
+			assert.NoError(t, err)
+			return
+		}
+	}))
+	defer ts.Close()
+
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	t.Log("full url")
-	rb, err := lr.Extract(context.Background(), "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
+	rb, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.Nil(t, err)
-	assert.Equal(t, "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "not changed")
+	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "not changed")
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", rb.Title)
 	assert.Equal(t, 9665, len(rb.Content))
 
 	t.Log("short url")
-	rb, err = lr.Extract(context.Background(), "https://goo.gl/IAvTHr")
+	rb, err = lr.Extract(context.Background(), ts.URL+"/IAvTHr")
 	assert.Nil(t, err)
-	assert.Equal(t, "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "full url")
+	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "full url")
 	assert.Equal(t, 9665, len(rb.Content))
 }
 
 func TestExtractGeneral(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() == "/v48b6Q" {
+			http.Redirect(w, r, "/p/2015/11/22/podcast-369/", http.StatusFound)
+			return
+		}
+		if r.URL.String() == "/p/2015/11/22/podcast-369/" {
+			fh, err := os.Open("testdata/podcast-369.html")
+			testHTML, err := io.ReadAll(fh)
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
+			_, err = w.Write(testHTML)
+			assert.NoError(t, err)
+			return
+		}
+		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
+			fh, err := os.Open("testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			testHTML, err := io.ReadAll(fh)
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
+			_, err = w.Write(testHTML)
+			assert.NoError(t, err)
+			return
+		}
+	}))
+	defer ts.Close()
+
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
-	a, err := lr.Extract(context.Background(), "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
+	a, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.Nil(t, err)
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", a.Title)
-	assert.Equal(t, "https://p.umputun.com/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", a.URL)
+	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", a.URL)
 	assert.Equal(t, "Не первый раз я практикую идею “а давайте, ребята, сделаем для общего блага …”, и вот опять. В нашем подкасте радио-т есть незаменимый инструмент, позволяющий собирать новости, готовить их к выпуску, ...", a.Excerpt)
-	assert.Equal(t, "p.umputun.com", a.Domain)
+	assert.Contains(t, ts.URL, a.Domain)
 
-	a, err = lr.Extract(context.Background(), "http://goo.gl/v48b6Q")
+	a, err = lr.Extract(context.Background(), ts.URL+"/v48b6Q")
 	assert.Nil(t, err)
 	assert.Equal(t, "UWP - Выпуск 369", a.Title)
-	assert.Equal(t, "https://podcast.umputun.com/p/2015/11/22/podcast-369/", a.URL)
+	assert.Equal(t, ts.URL+"/p/2015/11/22/podcast-369/", a.URL)
 	assert.Equal(t, "2015-11-22 Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по будкам …Отбиваюсь от опасных ...", a.Excerpt)
 	assert.Equal(t, "https://podcast.umputun.com/images/uwp/uwp369.jpg", a.Image)
-	assert.Equal(t, "podcast.umputun.com", a.Domain)
+	assert.Contains(t, ts.URL, a.Domain)
 	assert.Equal(t, 12, len(a.AllLinks))
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/media/ump_podcast369.mp3")
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/images/uwp/uwp369.jpg")
