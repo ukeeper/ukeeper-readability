@@ -31,8 +31,8 @@ type Server struct {
 type JSON map[string]interface{}
 
 // Run the lister and request's router, activate rest server
-func (s Server) Run() {
-	log.Printf("[INFO] activate rest server")
+func (s Server) Run(address string, port int) {
+	log.Printf("[INFO] activate rest server on %s:%d", address, port)
 
 	router := chi.NewRouter()
 
@@ -59,7 +59,7 @@ func (s Server) Run() {
 		})
 	})
 
-	fs, err := UM.NewFileServer("/", "/srv/web", UM.FsOptSPA)
+	fs, err := UM.NewFileServer("/", frontendDir, UM.FsOptSPA)
 	if err != nil {
 		log.Fatalf("unable to create, %v", err)
 	}
@@ -67,7 +67,7 @@ func (s Server) Run() {
 		fs.ServeHTTP(w, r)
 	})
 
-	log.Fatalf("server terminated, %v", http.ListenAndServe(":8080", router))
+	log.Fatalf("server terminated, %v", http.ListenAndServe(fmt.Sprintf("%s:%d", address, port), router))
 }
 
 func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {
