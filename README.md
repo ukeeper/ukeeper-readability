@@ -1,4 +1,23 @@
-### ureadability api [![build](https://github.com/umputun/ukeeper-redabilty/actions/workflows/ci.yml/badge.svg)](https://github.com/ukeeper/ukeeper-redabilty/actions/workflows/ci.yml)
+## ukeeper-readability [![build](https://github.com/umputun/ukeeper-redabilty/actions/workflows/ci.yml/badge.svg)](https://github.com/ukeeper/ukeeper-redabilty/actions/workflows/ci.yml)
+
+### Running instructions
+
+`docker-compose up` will leave you with working ukeeper-redabilty service (both API and frontend) running on <http://localhost:8080>.
+
+### Configuration
+
+| Command line | Environment     | Default        | Description                         |
+|--------------|-----------------|----------------|-------------------------------------|
+| address      | UKEEPER_ADDRESS | all interfaces | web server listening address        |
+| port         | UKEEPER_PORT    | `8080`         | web server port                     |
+| mongo_uri    | MONGO_URI       | none           | MongoDB connection string, required |
+| frontend_dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files       |
+| mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                 |
+| mongo-db     | MONGO_DB        | `ureadability` | mongo database name                 |
+| creds        | CREDS           | none           | credentials for protected calls     |
+| dbg          | DEBUG           | `false`        | debug mode                          |
+
+### ureadability api
 
     GET /api/content/v1/parser?token=blah&url=http://aa.com/blah - extract content (emulate Readability API parse call)
     POST /api/v1/extract {url: http://aa.com/blah}  - extract content
