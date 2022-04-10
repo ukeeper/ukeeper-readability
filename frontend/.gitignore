@@ -1,5 +1,2 @@
-.DS_Store
 dev/_blocks/
 node_modules/
-*.sublime-*
-API.md
