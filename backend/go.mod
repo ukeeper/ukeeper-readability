@@ -11,6 +11,7 @@ require (
 	github.com/go-pkgz/lgr v0.10.4
 	github.com/go-pkgz/rest v1.12.0
 	github.com/jessevdk/go-flags v1.5.0
+	github.com/kennygrant/sanitize v1.2.4
 	github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
 	github.com/stretchr/testify v1.7.0
 	go.mongodb.org/mongo-driver v1.8.3

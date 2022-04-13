@@ -7,9 +7,8 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/kennygrant/sanitize"
 	"golang.org/x/net/html/charset"
-
-	"github.com/ukeeper/ukeeper-redabilty/backend/sanitize"
 )
 
 // get clean text from html content
