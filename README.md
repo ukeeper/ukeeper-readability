@@ -31,6 +31,8 @@
 
 on master (dev version) prefix /ureadability should be added
 
+<details><summary>HTTP calls</summary>
+
     http POST "master.radio-t.com:8780/ureadability/api/v1/rule" domain=blah.ukeeper.com content="#content p" enabled:=true
     HTTP/1.1 200 OK
     Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
@@ -82,3 +84,16 @@ on master (dev version) prefix /ureadability should be added
             "user": ""
         }
     ]
+</details>
+
+## Development
+
+### Running tests
+
+To run the full test suite, you need MongoDB running without authorisation on port 27017. To start such Mongo instance, check comments in `docker-compose.yaml` file and run Mongo according to them.
+
+Command to run full test suite would be:
+
+```shell
+ENABLE_MONGO_TESTS=true go test ./...
+```
