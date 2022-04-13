@@ -32,7 +32,6 @@ type Rules interface {
 type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
-	Debug       bool
 	Rules       Rules
 }
 
@@ -85,11 +84,11 @@ func (f UReadability) Extract(ctx context.Context, reqURL string) (rb *Response,
 	}()
 
 	rb.URL = resp.Request.URL.String()
-	dataBytes, err := ioutil.ReadAll(resp.Body)
+	dataBytes, e := ioutil.ReadAll(resp.Body)
 
-	if err != nil {
-		log.Printf("[WARN] failed to read data from %s, error=%v", reqURL, err)
-		return nil, err
+	if e != nil {
+		log.Printf("[WARN] failed to read data from %s, error=%v", reqURL, e)
+		return nil, e
 	}
 
 	var body string
@@ -195,15 +194,11 @@ func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (res
 			srcLink = fmt.Sprintf(`"%s"`, srcLink)
 			absLink = fmt.Sprintf(`"%s"`, absLink)
 			result = strings.ReplaceAll(result, srcLink, absLink)
-			if f.Debug {
-				log.Printf("[DEBUG] normalized %s -> %s", srcLink, dstLink)
-			}
+			log.Printf("[DEBUG] normalized %s -> %s", srcLink, dstLink)
 			normalizedCount++
 		}
 		links = append(links, dstLink)
 	}
-	if f.Debug {
-		log.Printf("[DEBUG] normalized %d links", normalizedCount)
-	}
+	log.Printf("[DEBUG] normalized %d links", normalizedCount)
 	return result, links
 }

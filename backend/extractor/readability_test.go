@@ -26,11 +26,16 @@ func TestExtractURL(t *testing.T) {
 		}
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			w.Header().Set("Content-Type", "text/html; charset=windows-1251") // test non-standard charset decoding
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
 			_, err = w.Write(testHTML)
 			assert.NoError(t, err)
+			return
+		}
+		if r.URL.String() == "/bad_body" {
+			w.Header().Set("Content-Length", "1") // error on reading body
 			return
 		}
 	}))
@@ -39,16 +44,26 @@ func TestExtractURL(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	t.Log("full url")
 	rb, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "not changed")
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", rb.Title)
 	assert.Equal(t, 9665, len(rb.Content))
 
 	t.Log("short url")
 	rb, err = lr.Extract(context.Background(), ts.URL+"/IAvTHr")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "full url")
 	assert.Equal(t, 9665, len(rb.Content))
+
+	t.Log("bad body")
+	rb, err = lr.Extract(context.Background(), ts.URL+"/bad_body")
+	//assert.Error(t, err) // TODO: uncomment, wtf?! this should return error!
+	assert.Nil(t, rb)
+
+	t.Log("bad url")
+	rb, err = lr.Extract(context.Background(), "http://bad_url")
+	assert.Error(t, err)
+	assert.Nil(t, rb)
 }
 
 func TestExtractGeneral(t *testing.T) {
@@ -80,20 +95,20 @@ func TestExtractGeneral(t *testing.T) {
 
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	a, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", a.Title)
 	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", a.URL)
 	assert.Equal(t, "Не первый раз я практикую идею “а давайте, ребята, сделаем для общего блага …”, и вот опять. В нашем подкасте радио-т есть незаменимый инструмент, позволяющий собирать новости, готовить их к выпуску, ...", a.Excerpt)
 	assert.Contains(t, ts.URL, a.Domain)
 
 	a, err = lr.Extract(context.Background(), ts.URL+"/v48b6Q")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "UWP - Выпуск 369", a.Title)
 	assert.Equal(t, ts.URL+"/p/2015/11/22/podcast-369/", a.URL)
 	assert.Equal(t, "2015-11-22 Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по будкам …Отбиваюсь от опасных ...", a.Excerpt)
 	assert.Equal(t, "https://podcast.umputun.com/images/uwp/uwp369.jpg", a.Image)
 	assert.Contains(t, ts.URL, a.Domain)
-	assert.Equal(t, 12, len(a.AllLinks))
+	assert.Equal(t, 13, len(a.AllLinks))
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/media/ump_podcast369.mp3")
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/images/uwp/uwp369.jpg")
 	log.Printf("links=%v", a.AllLinks)
@@ -118,7 +133,7 @@ func TestNormalizeLinks(t *testing.T) {
 func TestNormalizeLinksIssue(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200}
 	_, err := lr.Extract(context.Background(), "https://git-scm.com/book/en/v2/Git-Tools-Submodules")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 type RulesMock struct{}
@@ -139,14 +154,14 @@ func TestGetContentCustom(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}
 	httpClient := &http.Client{Timeout: time.Second * 30}
 	resp, err := httpClient.Get("https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	defer resp.Body.Close()
 	dataBytes, err := ioutil.ReadAll(resp.Body)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	body := string(dataBytes)
 
 	content, rich, err := lr.getContent(context.Background(), body, "https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 6988, len(content))
 	assert.Equal(t, 7169, len(rich))
 }

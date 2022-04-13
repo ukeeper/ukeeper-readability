@@ -40,7 +40,7 @@ func main() {
 		log.Fatalf("[ERROR] can't connect to mongo %v", err)
 	}
 	srv := rest.Server{
-		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: db.GetStores(), Debug: opts.Debug},
+		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: db.GetStores()},
 		Credentials: opts.Credentials,
 		Version:     revision,
 	}
