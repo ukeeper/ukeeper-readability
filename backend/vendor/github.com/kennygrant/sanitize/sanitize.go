@@ -16,7 +16,7 @@ import (
 var (
 	ignoreTags = []string{"title", "script", "style", "iframe", "frame", "frameset", "noframes", "noembed", "embed", "applet", "object", "base"}
 
-	defaultTags = []string{"h1", "h2", "h3", "h4", "h5", "h6", "div", "span", "hr", "p", "br", "b", "i", "strong", "em", "ol", "ul", "li", "a", "img", "pre", "code", "blockquote"}
+	defaultTags = []string{"h1", "h2", "h3", "h4", "h5", "h6", "div", "span", "hr", "p", "br", "b", "i", "strong", "em", "ol", "ul", "li", "a", "img", "pre", "code", "blockquote", "article", "section"}
 
 	defaultAttributes = []string{"id", "class", "src", "href", "title", "alt", "name", "rel"}
 )
@@ -24,6 +24,7 @@ var (
 // HTMLAllowing sanitizes html, allowing some tags.
 // Arrays of allowed tags and allowed attributes may optionally be passed as the second and third arguments.
 func HTMLAllowing(s string, args ...[]string) (string, error) {
+
 	allowedTags := defaultTags
 	if len(args) > 0 {
 		allowedTags = args[0]
@@ -44,6 +45,7 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 		token := tokenizer.Token()
 
 		switch tokenType {
+
 		case parser.ErrorToken:
 			err := tokenizer.Err()
 			if err == io.EOF {
@@ -55,9 +57,7 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 
 			if len(ignore) == 0 && includes(allowedTags, token.Data) {
 				token.Attr = cleanAttributes(token.Attr, allowedAttributes)
-				if _, err := buffer.WriteString(token.String()); err != nil {
-					return "", err
-				}
+				buffer.WriteString(token.String())
 			} else if includes(ignoreTags, token.Data) {
 				ignore = token.Data
 			}
@@ -66,9 +66,7 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 
 			if len(ignore) == 0 && includes(allowedTags, token.Data) {
 				token.Attr = cleanAttributes(token.Attr, allowedAttributes)
-				if _, err := buffer.WriteString(token.String()); err != nil {
-					return "", err
-				}
+				buffer.WriteString(token.String())
 			} else if token.Data == ignore {
 				ignore = ""
 			}
@@ -76,9 +74,7 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 		case parser.EndTagToken:
 			if len(ignore) == 0 && includes(allowedTags, token.Data) {
 				token.Attr = []parser.Attribute{}
-				if _, err := buffer.WriteString(token.String()); err != nil {
-					return "", err
-				}
+				buffer.WriteString(token.String())
 			} else if token.Data == ignore {
 				ignore = ""
 			}
@@ -86,9 +82,7 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 		case parser.TextToken:
 			// We allow text content through, unless ignoring this entire tag and its contents (including other tags)
 			if ignore == "" {
-				if _, err := buffer.WriteString(token.String()); err != nil {
-					return "", err
-				}
+				buffer.WriteString(token.String())
 			}
 		case parser.CommentToken:
 			// We ignore comments by default
@@ -96,28 +90,32 @@ func HTMLAllowing(s string, args ...[]string) (string, error) {
 			// We ignore doctypes by default - html5 does not require them and this is intended for sanitizing snippets of text
 		default:
 			// We ignore unknown token types by default
+
 		}
+
 	}
+
 }
 
 // HTML strips html tags, replace common entities, and escapes <>&;'" in the result.
 // Note the returned text may contain entities as it is escaped by HTMLEscapeString, and most entities are not translated.
-func HTML(s string) string {
-	var output string
+func HTML(s string) (output string) {
 
 	// Shortcut strings with no tags in them
 	if !strings.ContainsAny(s, "<>") {
 		output = s
 	} else {
+
 		// First remove line breaks etc as these have no meaning outside html tags (except pre)
-		// this means pre sections will lose formatting... but will result in less unintentional params.
-		s = strings.ReplaceAll(s, "\n", "")
+		// this means pre sections will lose formatting... but will result in less unintentional paras.
+		s = strings.Replace(s, "\n", "", -1)
 
 		// Then replace line breaks with newlines, to preserve that formatting
-		s = strings.ReplaceAll(s, "</p>", "\n")
-		s = strings.ReplaceAll(s, "<br>", "\n")
-		s = strings.ReplaceAll(s, "</br>", "\n")
-		s = strings.ReplaceAll(s, "<br/>", "\n")
+		s = strings.Replace(s, "</p>", "\n", -1)
+		s = strings.Replace(s, "<br>", "\n", -1)
+		s = strings.Replace(s, "</br>", "\n", -1)
+		s = strings.Replace(s, "<br/>", "\n", -1)
+		s = strings.Replace(s, "<br />", "\n", -1)
 
 		// Walk through the string removing all tags
 		b := bytes.NewBufferString("")
@@ -138,13 +136,13 @@ func HTML(s string) string {
 	}
 
 	// Remove a few common harmless entities, to arrive at something more like plain text
-	output = strings.ReplaceAll(output, "&#8216;", "'")
-	output = strings.ReplaceAll(output, "&#8217;", "'")
-	output = strings.ReplaceAll(output, "&#8220;", "\"")
-	output = strings.ReplaceAll(output, "&#8221;", "\"")
-	output = strings.ReplaceAll(output, "&nbsp;", " ")
-	output = strings.ReplaceAll(output, "&quot;", "\"")
-	output = strings.ReplaceAll(output, "&apos;", "'")
+	output = strings.Replace(output, "&#8216;", "'", -1)
+	output = strings.Replace(output, "&#8217;", "'", -1)
+	output = strings.Replace(output, "&#8220;", "\"", -1)
+	output = strings.Replace(output, "&#8221;", "\"", -1)
+	output = strings.Replace(output, "&nbsp;", " ", -1)
+	output = strings.Replace(output, "&quot;", "\"", -1)
+	output = strings.Replace(output, "&apos;", "'", -1)
 
 	// Translate some entities into their plain text equivalent (for example accents, if encoded as entities)
 	output = html.UnescapeString(output)
@@ -153,25 +151,29 @@ func HTML(s string) string {
 	output = template.HTMLEscapeString(output)
 
 	// After processing, remove some harmless entities &, ' and " which are encoded by HTMLEscapeString
-	output = strings.ReplaceAll(output, "&#34;", "\"")
-	output = strings.ReplaceAll(output, "&#39;", "'")
-	output = strings.ReplaceAll(output, "&amp; ", "& ")     // NB space after
-	output = strings.ReplaceAll(output, "&amp;amp; ", "& ") // NB space after
+	output = strings.Replace(output, "&#34;", "\"", -1)
+	output = strings.Replace(output, "&#39;", "'", -1)
+	output = strings.Replace(output, "&amp; ", "& ", -1)     // NB space after
+	output = strings.Replace(output, "&amp;amp; ", "& ", -1) // NB space after
 
 	return output
 }
 
 // We are very restrictive as this is intended for ascii url slugs
-var illegalPath = regexp.MustCompile(`[^[:alnum:]~\-./]`)
+var illegalPath = regexp.MustCompile(`[^[:alnum:]\~\-\./]`)
 
-// Path makes a string safe to use as an url path.
+// Path makes a string safe to use as a URL path,
+// removing accents and replacing separators with -.
+// The path may still start at / and is not intended
+// for use as a file system path without prefix.
 func Path(s string) string {
 	// Start with lowercase string
 	filePath := strings.ToLower(s)
-	filePath = strings.ReplaceAll(filePath, "..", "")
+	filePath = strings.Replace(filePath, "..", "", -1)
 	filePath = path.Clean(filePath)
 
-	// Remove illegal characters for paths, flattening accents and replacing some common separators with -
+	// Remove illegal characters for paths, flattening accents
+	// and replacing some common separators with -
 	filePath = cleanString(filePath, illegalPath)
 
 	// NB this may be of length 0, caller must check
@@ -200,6 +202,7 @@ var baseNameSeparators = regexp.MustCompile(`[./]`)
 // BaseName makes a string safe to use in a file name, producing a sanitized basename replacing . or / with -.
 // No attempt is made to normalise a path or normalise case.
 func BaseName(s string) string {
+
 	// Replace certain joining characters with a dash
 	baseName := baseNameSeparators.ReplaceAllString(s, "-")
 
@@ -236,20 +239,21 @@ var transliterations = map[rune]string{
 	'Ó': "O",
 	'Ô': "O",
 	'Õ': "O",
-	'Ö': "O",
+	'Ö': "OE",
 	'Ø': "OE",
+	'Œ': "OE",
 	'Ù': "U",
 	'Ú': "U",
-	'Ü': "U",
+	'Ü': "UE",
 	'Û': "U",
 	'Ý': "Y",
-	'Þ': "Th",
-	'ß': "ss",
+	'Þ': "TH",
+	'ẞ': "SS",
 	'à': "a",
 	'á': "a",
 	'â': "a",
 	'ã': "a",
-	'ä': "a",
+	'ä': "ae",
 	'å': "aa",
 	'æ': "ae",
 	'ç': "c",
@@ -270,20 +274,20 @@ var transliterations = map[rune]string{
 	'ô': "o",
 	'õ': "o",
 	'ō': "o",
-	'ö': "o",
+	'ö': "oe",
 	'ø': "oe",
+	'œ': "oe",
 	'ś': "s",
 	'ù': "u",
 	'ú': "u",
 	'û': "u",
 	'ū': "u",
-	'ü': "u",
+	'ü': "ue",
 	'ý': "y",
-	'þ': "th",
 	'ÿ': "y",
 	'ż': "z",
-	'Œ': "OE",
-	'œ': "oe",
+	'þ': "th",
+	'ß': "ss",
 }
 
 // Accents replaces a set of accented characters with ascii equivalents.
@@ -308,7 +312,7 @@ var (
 	illegalAttr = regexp.MustCompile(`(d\s*a\s*t\s*a|j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*)\s*:`)
 
 	// We are far more restrictive with href attributes.
-	legalHrefAttr = regexp.MustCompile(`\A[/#][^/\\]?|mailto://|http://|https://`)
+	legalHrefAttr = regexp.MustCompile(`\A[/#][^/\\]?|mailto:|http://|https://`)
 )
 
 // cleanAttributes returns an array of attributes after removing malicious ones.
@@ -320,6 +324,7 @@ func cleanAttributes(a []parser.Attribute, allowed []string) []parser.Attribute 
 	var cleaned []parser.Attribute
 	for _, attr := range a {
 		if includes(allowed, attr.Key) {
+
 			val := strings.ToLower(attr.Val)
 
 			// Check for illegal attribute values
@@ -353,6 +358,7 @@ var (
 // cleanString replaces separators with - and removes characters listed in the regexp provided from string.
 // Accents, spaces, and all characters not in A-Za-z0-9 are replaced.
 func cleanString(s string, r *regexp.Regexp) string {
+
 	// Remove any trailing space to avoid ending on -
 	s = strings.Trim(s, " ")
 
