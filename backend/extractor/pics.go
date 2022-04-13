@@ -46,16 +46,14 @@ func (f UReadability) extractPics(iselect *goquery.Selection, url string) (mainI
 		return "", nil, false
 	}
 
-	// get biggest picture
+	// get the biggest picture
 	keys := make([]int, 0, len(images))
 	for k := range images {
 		keys = append(keys, k)
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
 	mainImage = images[keys[0]]
-	if f.Debug {
-		log.Printf("[DEBUG] total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
-	}
+	log.Printf("[DEBUG] total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
 	return mainImage, allImages, true
 }
 
@@ -64,7 +62,7 @@ func (f UReadability) getImageSize(url string) (size int) {
 	httpClient := &http.Client{Timeout: time.Second * 30}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Printf("[WARN] can't get pic from %s", url)
+		log.Printf("[WARN] can't create request to get pic from %s", url)
 		return 0
 	}
 	req.Close = true
