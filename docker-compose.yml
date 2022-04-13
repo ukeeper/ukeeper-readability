@@ -34,6 +34,10 @@ services:
     restart: always
     container_name: ureadability-mongo
 
+    # uncomment to make mongo available for tests
+    #ports:
+    #  - "27017:27017"
+
     environment:
       - MONGO_INITDB_DATABASE=admin
       - MONGO_INITDB_ROOT_USERNAME=root
