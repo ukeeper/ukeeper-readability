@@ -2,6 +2,7 @@
 package rest
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -30,8 +31,8 @@ type Server struct {
 // JSON is a map alias, just for convenience
 type JSON map[string]interface{}
 
-// Run the lister and request's router, activate rest server
-func (s Server) Run(address string, port int) {
+// Run the listen and request's router, activate rest server
+func (s Server) Run(ctx context.Context, address string, port int, frontendDir string) {
 	log.Printf("[INFO] activate rest server on %s:%d", address, port)
 
 	router := chi.NewRouter()
@@ -67,7 +68,23 @@ func (s Server) Run(address string, port int) {
 		fs.ServeHTTP(w, r)
 	})
 
-	log.Fatalf("server terminated, %v", http.ListenAndServe(fmt.Sprintf("%s:%d", address, port), router))
+	httpServer := &http.Server{
+		Addr:              fmt.Sprintf("%s:%d", address, port),
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		// WriteTimeout:      120 * time.Second, // TODO: such a long timeout needed for blocking export (backup) request
+		IdleTimeout: 30 * time.Second,
+	}
+	go func() {
+		// shutdown on context cancellation
+		<-ctx.Done()
+		if err := httpServer.Shutdown(ctx); err != nil {
+			log.Printf("[DEBUG] http shutdown error, %s", err)
+		}
+		log.Print("[DEBUG] http server shutdown completed")
+	}()
+
+	log.Printf("[WARN] http server terminated, %s", httpServer.ListenAndServe())
 }
 
 func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {

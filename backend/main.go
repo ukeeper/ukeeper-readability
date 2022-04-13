@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	log "github.com/go-pkgz/lgr"
@@ -41,7 +44,17 @@ func main() {
 		Credentials: opts.Credentials,
 		Version:     revision,
 	}
-	srv.Run(opts.Address, opts.Port, opts.FrontendDir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { // catch signal and invoke graceful termination
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+		<-stop
+		log.Printf("[WARN] interrupt signal")
+		cancel()
+	}()
+
+	srv.Run(ctx, opts.Address, opts.Port, opts.FrontendDir)
 }
 
 func setupLog(dbg bool) {
