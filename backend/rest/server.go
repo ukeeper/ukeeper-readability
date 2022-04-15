@@ -35,6 +35,26 @@ type JSON map[string]interface{}
 func (s Server) Run(ctx context.Context, address string, port int, frontendDir string) {
 	log.Printf("[INFO] activate rest server on %s:%d", address, port)
 
+	httpServer := &http.Server{
+		Addr:              fmt.Sprintf("%s:%d", address, port),
+		Handler:           s.routes(frontendDir),
+		ReadHeaderTimeout: 5 * time.Second,
+		// WriteTimeout:      120 * time.Second, // TODO: such a long timeout needed for blocking export (backup) request
+		IdleTimeout: 30 * time.Second,
+	}
+	go func() {
+		// shutdown on context cancellation
+		<-ctx.Done()
+		if err := httpServer.Shutdown(ctx); err != nil {
+			log.Printf("[DEBUG] http shutdown error, %s", err)
+		}
+		log.Print("[DEBUG] http server shutdown completed")
+	}()
+
+	log.Printf("[WARN] http server terminated, %s", httpServer.ListenAndServe())
+}
+
+func (s Server) routes(frontendDir string) chi.Router {
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID, middleware.RealIP, UM.Recoverer(log.Default()))
@@ -67,24 +87,7 @@ func (s Server) Run(ctx context.Context, address string, port int, frontendDir s
 	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
 	})
-
-	httpServer := &http.Server{
-		Addr:              fmt.Sprintf("%s:%d", address, port),
-		Handler:           router,
-		ReadHeaderTimeout: 5 * time.Second,
-		// WriteTimeout:      120 * time.Second, // TODO: such a long timeout needed for blocking export (backup) request
-		IdleTimeout: 30 * time.Second,
-	}
-	go func() {
-		// shutdown on context cancellation
-		<-ctx.Done()
-		if err := httpServer.Shutdown(ctx); err != nil {
-			log.Printf("[DEBUG] http shutdown error, %s", err)
-		}
-		log.Print("[DEBUG] http server shutdown completed")
-	}()
-
-	log.Printf("[WARN] http server terminated, %s", httpServer.ListenAndServe())
+	return router
 }
 
 func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {
