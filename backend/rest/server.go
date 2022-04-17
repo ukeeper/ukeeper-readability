@@ -25,6 +25,7 @@ import (
 type Server struct {
 	Readability extractor.UReadability
 	Version     string
+	Token       string
 	Credentials map[string]string
 }
 
@@ -32,7 +33,7 @@ type Server struct {
 type JSON map[string]interface{}
 
 // Run the listen and request's router, activate rest server
-func (s Server) Run(ctx context.Context, address string, port int, frontendDir string) {
+func (s *Server) Run(ctx context.Context, address string, port int, frontendDir string) {
 	log.Printf("[INFO] activate rest server on %s:%d", address, port)
 
 	httpServer := &http.Server{
@@ -54,7 +55,7 @@ func (s Server) Run(ctx context.Context, address string, port int, frontendDir s
 	log.Printf("[WARN] http server terminated, %s", httpServer.ListenAndServe())
 }
 
-func (s Server) routes(frontendDir string) chi.Router {
+func (s *Server) routes(frontendDir string) chi.Router {
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID, middleware.RealIP, UM.Recoverer(log.Default()))
@@ -90,7 +91,7 @@ func (s Server) routes(frontendDir string) chi.Router {
 	return router
 }
 
-func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {
+func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 	artRequest := extractor.Response{}
 	if err := render.DecodeJSON(r.Body, &artRequest); err != nil {
 		render.Status(r, http.StatusInternalServerError)
@@ -109,11 +110,18 @@ func (s Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 }
 
 // emulate readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
-func (s Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
+// if token is not set for application, it won't be checked
+func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
-	if token == "" {
+	if s.Token != "" && token == "" {
 		render.Status(r, http.StatusExpectationFailed)
 		render.JSON(w, r, JSON{"error": "no token passed"})
+		return
+	}
+
+	if s.Token != "" && s.Token != token {
+		render.Status(r, http.StatusUnauthorized)
+		render.JSON(w, r, JSON{"error": "wrong token passed"})
 		return
 	}
 
@@ -135,7 +143,7 @@ func (s Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.
 }
 
 // GetRule find rule matching url param (domain portion only)
-func (s Server) GetRule(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetRule(w http.ResponseWriter, r *http.Request) {
 	url := r.URL.Query().Get("url")
 	if url == "" {
 		render.Status(r, http.StatusExpectationFailed)
@@ -155,7 +163,7 @@ func (s Server) GetRule(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetRuleByID returns rule by id - GET /rule/:id"
-func (s Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
 	id := getBid(chi.URLParam(r, "id"))
 	rule, found := s.Readability.Rules.GetByID(r.Context(), id)
 	if !found {
@@ -168,12 +176,12 @@ func (s Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAllRules returns list of all rules, including disabled
-func (s Server) GetAllRules(w http.ResponseWriter, r *http.Request) {
+func (s *Server) GetAllRules(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, s.Readability.Rules.All(r.Context()))
 }
 
 // SaveRule upsert rule, forcing enabled=true
-func (s Server) SaveRule(w http.ResponseWriter, r *http.Request) {
+func (s *Server) SaveRule(w http.ResponseWriter, r *http.Request) {
 	rule := datastore.Rule{}
 
 	if err := render.DecodeJSON(r.Body, &rule); err != nil {
@@ -193,7 +201,7 @@ func (s Server) SaveRule(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteRule marks rule as disabled
-func (s Server) DeleteRule(w http.ResponseWriter, r *http.Request) {
+func (s *Server) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	id := getBid(chi.URLParam(r, "id"))
 	err := s.Readability.Rules.Disable(r.Context(), id)
 	if err != nil {
@@ -205,7 +213,7 @@ func (s Server) DeleteRule(w http.ResponseWriter, r *http.Request) {
 }
 
 // AuthFake just a dummy post request used for external check for protected resource
-func (s Server) AuthFake(w http.ResponseWriter, r *http.Request) {
+func (s *Server) AuthFake(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
 	render.JSON(w, r, JSON{"pong": t.Format("20060102150405")})
 }

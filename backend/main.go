@@ -22,6 +22,7 @@ var opts struct {
 	Port        int               `long:"port" env:"UKEEPER_PORT" default:"8080" description:"port"`
 	FrontendDir string            `long:"frontend_dir" env:"FRONTEND_DIR" default:"/srv/web" description:"directory with frontend files"`
 	Credentials map[string]string `long:"creds" env:"CREDS" description:"credentials for protected calls"`
+	Token       string            `long:"token" env:"UKEEPER_TOKEN" description:"token for /content/v1/parser endpoint auth"`
 	MongoURI    string            `short:"m" long:"mongo_uri" env:"MONGO_URI" required:"true" description:"MongoDB connection string"`
 	MongoDelay  time.Duration     `long:"mongo-delay" env:"MONGO_DELAY" default:"0" description:"mongo initial delay"`
 	MongoDB     string            `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
@@ -41,6 +42,7 @@ func main() {
 	}
 	srv := rest.Server{
 		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: db.GetStores()},
+		Token:       opts.Token,
 		Credentials: opts.Credentials,
 		Version:     revision,
 	}
