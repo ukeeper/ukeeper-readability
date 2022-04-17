@@ -69,15 +69,15 @@ func (s *Server) routes(frontendDir string) chi.Router {
 		r.Get("/content/v1/parser", s.extractArticleEmulateReadability)
 		r.Post("/extract", s.extractArticle)
 
-		r.Get("/rule", s.GetRule)
-		r.Get("/rule/{id}", s.GetRuleByID)
-		r.Get("/rules", s.GetAllRules)
-		r.Post("/auth", s.AuthFake)
+		r.Get("/rule", s.getRule)
+		r.Get("/rule/{id}", s.getRuleByID)
+		r.Get("/rules", s.getAllRules)
+		r.Post("/auth", s.authFake)
 
 		r.Group(func(protected chi.Router) {
 			protected.Use(basicAuth("ureadability", s.Credentials))
-			protected.Post("/rule", s.SaveRule)
-			protected.Delete("/rule/{id}", s.DeleteRule)
+			protected.Post("/rule", s.saveRule)
+			protected.Delete("/rule/{id}", s.deleteRule)
 		})
 	})
 
@@ -148,8 +148,8 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 	render.JSON(w, r, &res)
 }
 
-// GetRule find rule matching url param (domain portion only)
-func (s *Server) GetRule(w http.ResponseWriter, r *http.Request) {
+// getRule find rule matching url param (domain portion only)
+func (s *Server) getRule(w http.ResponseWriter, r *http.Request) {
 	url := r.URL.Query().Get("url")
 	if url == "" {
 		render.Status(r, http.StatusExpectationFailed)
@@ -168,8 +168,8 @@ func (s *Server) GetRule(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, rule)
 }
 
-// GetRuleByID returns rule by id - GET /rule/:id"
-func (s *Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
+// getRuleByID returns rule by id - GET /rule/:id"
+func (s *Server) getRuleByID(w http.ResponseWriter, r *http.Request) {
 	id := getBid(chi.URLParam(r, "id"))
 	rule, found := s.Readability.Rules.GetByID(r.Context(), id)
 	if !found {
@@ -181,13 +181,13 @@ func (s *Server) GetRuleByID(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, &rule)
 }
 
-// GetAllRules returns list of all rules, including disabled
-func (s *Server) GetAllRules(w http.ResponseWriter, r *http.Request) {
+// getAllRules returns list of all rules, including disabled
+func (s *Server) getAllRules(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, s.Readability.Rules.All(r.Context()))
 }
 
-// SaveRule upsert rule, forcing enabled=true
-func (s *Server) SaveRule(w http.ResponseWriter, r *http.Request) {
+// saveRule upsert rule, forcing enabled=true
+func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
 	rule := datastore.Rule{}
 
 	if err := render.DecodeJSON(r.Body, &rule); err != nil {
@@ -206,8 +206,8 @@ func (s *Server) SaveRule(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, &srule)
 }
 
-// DeleteRule marks rule as disabled
-func (s *Server) DeleteRule(w http.ResponseWriter, r *http.Request) {
+// deleteRule marks rule as disabled
+func (s *Server) deleteRule(w http.ResponseWriter, r *http.Request) {
 	id := getBid(chi.URLParam(r, "id"))
 	err := s.Readability.Rules.Disable(r.Context(), id)
 	if err != nil {
@@ -218,8 +218,8 @@ func (s *Server) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, JSON{"disabled": id})
 }
 
-// AuthFake just a dummy post request used for external check for protected resource
-func (s *Server) AuthFake(w http.ResponseWriter, r *http.Request) {
+// authFake just a dummy post request used for external check for protected resource
+func (s *Server) authFake(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
 	render.JSON(w, r, JSON{"pong": t.Format("20060102150405")})
 }
