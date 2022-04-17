@@ -6,20 +6,21 @@
 
 ### Configuration
 
-| Command line | Environment     | Default        | Description                         |
-|--------------|-----------------|----------------|-------------------------------------|
-| address      | UKEEPER_ADDRESS | all interfaces | web server listening address        |
-| port         | UKEEPER_PORT    | `8080`         | web server port                     |
-| mongo_uri    | MONGO_URI       | none           | MongoDB connection string, required |
-| frontend_dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files       |
-| mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                 |
-| mongo-db     | MONGO_DB        | `ureadability` | mongo database name                 |
-| creds        | CREDS           | none           | credentials for protected calls     |
-| dbg          | DEBUG           | `false`        | debug mode                          |
+| Command line | Environment     | Default        | Description                                |
+|--------------|-----------------|----------------|--------------------------------------------|
+| address      | UKEEPER_ADDRESS | all interfaces | web server listening address               |
+| port         | UKEEPER_PORT    | `8080`         | web server port                            |
+| mongo_uri    | MONGO_URI       | none           | MongoDB connection string, _required_      |
+| frontend_dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files              |
+| token        | TOKEN           | none           | token for /content/v1/parser endpoint auth |
+| mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                        |
+| mongo-db     | MONGO_DB        | `ureadability` | mongo database name                        |
+| creds        | CREDS           | none           | credentials for protected calls            |
+| dbg          | DEBUG           | `false`        | debug mode                                 |
 
-### ureadability api
+### API
 
-    GET /api/content/v1/parser?token=blah&url=http://aa.com/blah - extract content (emulate Readability API parse call)
+    GET /api/content/v1/parser?token=secret&url=http://aa.com/blah - extract content (emulate Readability API parse call)
     POST /api/v1/extract {url: http://aa.com/blah}  - extract content
 
     POST /api/v1/rule {"domain": "aa.com", content="#content p"} - add/update custom rule
