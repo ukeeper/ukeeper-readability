@@ -75,7 +75,7 @@ func (s *Server) routes(frontendDir string) chi.Router {
 		r.Post("/auth", s.AuthFake)
 
 		r.Group(func(protected chi.Router) {
-			basicAuth("ureadability", s.Credentials)
+			protected.Use(basicAuth("ureadability", s.Credentials))
 			protected.Post("/rule", s.SaveRule)
 			protected.Delete("/rule/{id}", s.DeleteRule)
 		})
@@ -96,6 +96,12 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 	if err := render.DecodeJSON(r.Body, &artRequest); err != nil {
 		render.Status(r, http.StatusInternalServerError)
 		render.JSON(w, r, JSON{"error": err.Error()})
+		return
+	}
+
+	if artRequest.URL == "" {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": "url parameter is required"})
 		return
 	}
 

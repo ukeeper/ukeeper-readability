@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +20,6 @@ func TestRules(t *testing.T) {
 	assert.NotNil(t, rules)
 	rule := Rule{
 		Domain:  "example.com",
-		Author:  time.Now().String(), // ensure entry gets updated, and its ID is returned on save
 		Enabled: true,
 	}
 
