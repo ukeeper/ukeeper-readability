@@ -44,6 +44,7 @@ jobs:
 
       - name: submit coverage
         run: $(go env GOPATH)/bin/goveralls -service="github" -coverprofile=$GITHUB_WORKSPACE/profile.cov
+        working-directory: backend
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
