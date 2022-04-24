@@ -22,7 +22,7 @@ RUN \
     echo "version=$version" && \
     go build -o ukeeper-readability -ldflags "-X main.revision=${version} -s -w" .
 
-FROM node:8 as build-frontend
+FROM --platform=$BUILDPLATFORM node:8 as build-frontend
 
 ADD frontend /build
 WORKDIR /build
