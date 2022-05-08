@@ -35,7 +35,7 @@ func main() {
 	}
 	setupLog(opts.Debug)
 
-	log.Printf("[INFO] started ureadability service %s", revision)
+	log.Printf("[INFO] started ukeeper-readability service %s", revision)
 	db, err := datastore.New(opts.MongoURI, opts.MongoDB, opts.MongoDelay)
 	if err != nil {
 		log.Fatalf("[ERROR] can't connect to mongo %v", err)
