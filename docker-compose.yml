@@ -2,7 +2,7 @@ version: '2'
 services:
   ureadability:
     build: .
-    image: umputun/ureadability:latest
+    image: umputun/ukeeper-readability:latest
     logging:
       driver: json-file
       options:
@@ -35,14 +35,14 @@ services:
     container_name: ureadability-mongo
 
     # uncomment to make mongo available for tests
-    #ports:
-    #  - "27017:27017"
+    ports:
+      - "27017:27017"
 
     environment:
       - MONGO_INITDB_DATABASE=admin
       # uncomment port and comment the next two lines to have mongodb ready for tests,
       # by running `ENABLE_MONGO_TESTS=true go test ./...`
-      - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=Squid3kIc6Dew4ad8Ci5
+#      - MONGO_INITDB_ROOT_USERNAME=root
+#      - MONGO_INITDB_ROOT_PASSWORD=Squid3kIc6Dew4ad8Ci5
     volumes:
       - /tmp/mongodb:/data/db
