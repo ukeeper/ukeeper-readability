@@ -9,37 +9,34 @@ run:
 linters:
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - dupl
-    - gas
     - errcheck
+    - exportloopref
+    - gas
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
     - gofmt
     - goimports
-    - revive
     - goprintffuncname
-    - gochecknoinits
     - gosec
     - gosimple
     - govet
     - ineffassign
-    - misspell
     - megacheck
+    - misspell
     - nakedret
+    - revive
     - rowserrcheck
-    - exportloopref
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
+    - unused
     - whitespace
   disable-all: true

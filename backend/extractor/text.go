@@ -1,7 +1,7 @@
 package extractor
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -89,7 +89,7 @@ func (f UReadability) toUtf8(content []byte, header http.Header) (contentType, o
 			log.Printf("[WARN] charset reader failed, %v", err)
 			return contentType, origEncoding, result
 		}
-		conv2utf8, err := ioutil.ReadAll(rr)
+		conv2utf8, err := io.ReadAll(rr)
 		if err != nil {
 			log.Printf("[WARN] convert to utf-8 failed, %b", err)
 			return contentType, origEncoding, result

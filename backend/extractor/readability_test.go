@@ -3,7 +3,6 @@ package extractor
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -156,7 +155,7 @@ func TestGetContentCustom(t *testing.T) {
 	resp, err := httpClient.Get("https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
-	dataBytes, err := ioutil.ReadAll(resp.Body)
+	dataBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	body := string(dataBytes)
 

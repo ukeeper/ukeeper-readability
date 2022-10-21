@@ -4,7 +4,7 @@ package extractor
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -84,7 +84,7 @@ func (f UReadability) Extract(ctx context.Context, reqURL string) (rb *Response,
 	}()
 
 	rb.URL = resp.Request.URL.String()
-	dataBytes, e := ioutil.ReadAll(resp.Body)
+	dataBytes, e := io.ReadAll(resp.Body)
 
 	if e != nil {
 		log.Printf("[WARN] failed to read data from %s, error=%v", reqURL, e)

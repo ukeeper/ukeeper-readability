@@ -1,7 +1,7 @@
 package extractor
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"sync"
@@ -78,7 +78,7 @@ func (f UReadability) getImageSize(url string) (size int) {
 		}
 	}()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("[WARN] failed to get %s, err=%v", url, err)
 		return 0
