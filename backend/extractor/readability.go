@@ -56,7 +56,7 @@ var (
 	reDot    = regexp.MustCompile(`\D(\.)\S`)
 )
 
-const userAgent = "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
+const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15"
 
 // Extract fetches page and retrieves article
 func (f UReadability) Extract(ctx context.Context, reqURL string) (rb *Response, err error) {
