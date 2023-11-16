@@ -152,14 +152,26 @@ func (m RulesMock) All(_ context.Context) []datastore.Rule                { retu
 func TestGetContentCustom(t *testing.T) {
 	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}
 	httpClient := &http.Client{Timeout: time.Second * 30}
-	resp, err := httpClient.Get("https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
+			fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")
+			testHTML, err := io.ReadAll(fh)
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
+			_, err = w.Write(testHTML)
+			assert.NoError(t, err)
+			return
+		}
+	}))
+	defer ts.Close()
+	resp, err := httpClient.Get(ts.URL + "/2015/09/25/poiezdka-s-apple-maps/")
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 	dataBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	body := string(dataBytes)
 
-	content, rich, err := lr.getContent(context.Background(), body, "https://p.umputun.com/2015/09/25/poiezdka-s-apple-maps/")
+	content, rich, err := lr.getContent(context.Background(), body, ts.URL+"/2015/09/25/poiezdka-s-apple-maps/")
 	assert.NoError(t, err)
 	assert.Equal(t, 6988, len(content))
 	assert.Equal(t, 7169, len(rich))
