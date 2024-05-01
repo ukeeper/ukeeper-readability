@@ -6,17 +6,17 @@
 
 ### Configuration
 
-| Command line | Environment     | Default        | Description                                |
-|--------------|-----------------|----------------|--------------------------------------------|
-| address      | UKEEPER_ADDRESS | all interfaces | web server listening address               |
-| port         | UKEEPER_PORT    | `8080`         | web server port                            |
-| mongo_uri    | MONGO_URI       | none           | MongoDB connection string, _required_      |
-| frontend_dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files              |
-| token        | TOKEN           | none           | token for /content/v1/parser endpoint auth |
-| mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                        |
-| mongo-db     | MONGO_DB        | `ureadability` | mongo database name                        |
-| creds        | CREDS           | none           | credentials for protected calls            |
-| dbg          | DEBUG           | `false`        | debug mode                                 |
+| Command line | Environment     | Default        | Description                                           |
+|--------------|-----------------|----------------|-------------------------------------------------------|
+| address      | UKEEPER_ADDRESS | all interfaces | web server listening address                          |
+| port         | UKEEPER_PORT    | `8080`         | web server port                                       |
+| mongo_uri    | MONGO_URI       | none           | MongoDB connection string, _required_                 |
+| frontend_dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files                         |
+| token        | TOKEN           | none           | token for /content/v1/parser endpoint auth            |
+| mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                                   |
+| mongo-db     | MONGO_DB        | `ureadability` | mongo database name                                   |
+| creds        | CREDS           | none           | credentials for protected calls (POST, DELETE /rules) |
+| dbg          | DEBUG           | `false`        | debug mode                                            |
 
 ### API
 
@@ -85,6 +85,7 @@ on master (dev version) prefix /ureadability should be added
             "user": ""
         }
     ]
+
 </details>
 
 ## Development
