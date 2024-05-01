@@ -1,12 +1,6 @@
 run:
   tests: false
   timeout: 5m
-  output:
-    format: tab
-issues:
-  exclude-dirs:
-    - vendor
-    - readability
 linters:
   enable:
     - bodyclose
@@ -40,3 +34,8 @@ linters:
     - unused
     - whitespace
   disable-all: true
+
+issues:
+  exclude-dirs:
+    - vendor
+    - readability

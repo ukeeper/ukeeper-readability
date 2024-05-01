@@ -27,7 +27,7 @@ github.com/go-chi/chi/v5/middleware
 # github.com/go-chi/render v1.0.3
 ## explicit; go 1.16
 github.com/go-chi/render
-# github.com/go-pkgz/expirable-cache v0.1.0
+# github.com/go-pkgz/expirable-cache v1.0.0
 ## explicit; go 1.14
 github.com/go-pkgz/expirable-cache
 # github.com/go-pkgz/lgr v0.11.1
@@ -38,7 +38,7 @@ github.com/go-pkgz/lgr
 github.com/go-pkgz/rest
 github.com/go-pkgz/rest/logger
 github.com/go-pkgz/rest/realip
-# github.com/golang/snappy v0.0.1
+# github.com/golang/snappy v0.0.4
 ## explicit
 github.com/golang/snappy
 # github.com/jessevdk/go-flags v1.5.0
@@ -47,19 +47,20 @@ github.com/jessevdk/go-flags
 # github.com/kennygrant/sanitize v1.2.4
 ## explicit
 github.com/kennygrant/sanitize
-# github.com/klauspost/compress v1.13.6
-## explicit; go 1.15
+# github.com/klauspost/compress v1.17.8
+## explicit; go 1.20
 github.com/klauspost/compress
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
+github.com/klauspost/compress/internal/cpuinfo
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
 ## explicit; go 1.16
 github.com/mauidude/go-readability
-# github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe
-## explicit
+# github.com/montanaflynn/stats v0.7.1
+## explicit; go 1.13
 github.com/montanaflynn/stats
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
@@ -77,8 +78,8 @@ github.com/xdg-go/scram
 # github.com/xdg-go/stringprep v1.0.4
 ## explicit; go 1.11
 github.com/xdg-go/stringprep
-# github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d
-## explicit
+# github.com/youmark/pkcs8 v0.0.0-20240424034433-3c2c7870ae76
+## explicit; go 1.22
 github.com/youmark/pkcs8
 # go.mongodb.org/mongo-driver v1.15.0
 ## explicit; go 1.18
@@ -133,13 +134,14 @@ go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage
 ## explicit; go 1.18
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/pbkdf2
+golang.org/x/crypto/scrypt
 # golang.org/x/net v0.24.0
 ## explicit; go 1.18
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
-# golang.org/x/sync v0.1.0
-## explicit
+# golang.org/x/sync v0.7.0
+## explicit; go 1.18
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
 # golang.org/x/sys v0.19.0
