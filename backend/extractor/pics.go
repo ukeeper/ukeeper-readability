@@ -21,7 +21,7 @@ func (f UReadability) extractPics(iselect *goquery.Selection, url string) (mainI
 	var resCh = make(chan imgInfo)
 	var wg sync.WaitGroup
 
-	iselect.Each(func(i int, s *goquery.Selection) {
+	iselect.Each(func(_ int, s *goquery.Selection) {
 		if im, ok := s.Attr("src"); ok {
 			wg.Add(1)
 			go func(url string) {

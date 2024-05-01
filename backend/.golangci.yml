@@ -3,7 +3,8 @@ run:
   timeout: 5m
   output:
     format: tab
-  skip-dirs:
+issues:
+  exclude-dirs:
     - vendor
     - readability
 linters:

@@ -147,7 +147,7 @@ func (f UReadability) getContent(ctx context.Context, body, reqURL string) (cont
 			return "", "", err
 		}
 		var res string
-		dbody.Find(rule.Content).Each(func(i int, s *goquery.Selection) {
+		dbody.Find(rule.Content).Each(func(_ int, s *goquery.Selection) {
 			if html, err := s.Html(); err == nil {
 				res += html
 			}

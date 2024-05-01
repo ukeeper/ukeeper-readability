@@ -75,7 +75,7 @@ func (f UReadability) toUtf8(content []byte, header http.Header) (contentType, o
 		return contentType, origEncoding, result
 	}
 
-	dbody.Find("head meta").Each(func(i int, s *goquery.Selection) {
+	dbody.Find("head meta").Each(func(_ int, s *goquery.Selection) {
 		if strings.EqualFold(s.AttrOr("http-equiv", ""), "Content-Type") {
 			contentTypeStr := s.AttrOr("content", "")
 			contentType, origEncoding = getContentTypeAndEncoding(contentTypeStr)
