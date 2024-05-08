@@ -35,6 +35,10 @@ RUN \
 # Run
 FROM umputun/baseimage:app-latest
 
+LABEL org.opencontainers.image.authors="Dmitry Verkhoturov <paskal.07@gmail.com>"
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#docker
+LABEL org.opencontainers.image.source="https://github.com/ukeeper/ukeeper-readability"
+
 RUN apk add --update ca-certificates && update-ca-certificates
 
 COPY --from=build-backend /build/backend/ukeeper-readability /srv/
