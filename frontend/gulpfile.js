@@ -1,22 +1,20 @@
 /* requires */
 
-import url from "gulp-css-url-adjuster";
-import uglify from "gulp-uglify";
 import fileinclude from "gulp-file-include";
 import concat from "gulp-concat";
 import cache from "gulp-cached";
 import browserSync from "browser-sync";
-import ifelse from "gulp-if";
-import util from "gulp-util";
 import rename from "gulp-rename";
 import {deleteAsync} from 'del';
-import addsrc from "gulp-add-src";
+import log from "fancy-log";
 import importOnce from "node-sass-import-once";
 import autoprefixer from "autoprefixer";
 import postcss from "gulp-postcss";
 import gulp from "gulp";
 import gulpSass from 'gulp-sass';
-import sassCompiler from 'sass';
+import * as sassCompiler from 'sass';
+import merge from "merge-stream";
+
 const sass = gulpSass(sassCompiler);
 
 /* paths */
@@ -44,14 +42,12 @@ const mask = {
 		images: 'public/images',
 		files: 'public/files',
 		fonts: 'public/fonts'
-	},
-	isProduction = (util.env.type === 'production'),
-	isDeploy = (util.env.type === 'deploy');
+	};
 
 gulp.task('html', function(cb) {
 	gulp.src(input.html)
 		.pipe(fileinclude())
-		.on('error', util.log)
+		.on('error', log)
 		.pipe(cache('htmling'))
 		.pipe(gulp.dest(output.main))
 		.pipe(browserSync.stream());
@@ -60,7 +56,7 @@ gulp.task('html', function(cb) {
 
 gulp.task('scss', function(cb) {
 	gulp.src(input.scss)
-		.pipe(sass({importer: importOnce}, false).on('error', util.log))
+		.pipe(sass({importer: importOnce}, false).on('error', log))
 		.pipe(gulp.dest(input.css))
 	cb();
 });
@@ -68,9 +64,7 @@ gulp.task('scss', function(cb) {
 gulp.task('css', function(cb) {
 	gulp.src(mask.css)
 		.pipe(cache('cssing'))
-		.pipe(postcss([autoprefixer({browsers: ["> 1%"]})]))
-		.pipe(url({replace: [/^i-/, '../images/i-']}))
-		.pipe(url({replace: [/^f-/, '../fonts/f-']}))
+		.pipe(postcss([autoprefixer()]))
 		.pipe(gulp.dest(output.css))
 		.pipe(browserSync.stream());
 	cb();
@@ -93,12 +87,12 @@ gulp.task('files', function(cb) {
 });
 
 gulp.task('js', function(cb) {
-	gulp.src(mask.js_f)
-		.pipe(concat('main.js'))
-		.pipe(addsrc(mask.js_b))
+	const js_f = gulp.src(mask.js_f).pipe(concat('main.js'));
+	const js_b = gulp.src(mask.js_b).pipe(concat('main.js'));
+
+	merge(js_f, js_b)
 		.pipe(concat('main.js'))
 		.pipe(cache('jsing'))
-		.pipe(ifelse(isProduction || isDeploy, uglify()))
 		.pipe(gulp.dest(output.js))
 		.pipe(browserSync.stream());
 	cb();
