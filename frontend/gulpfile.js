@@ -1,34 +1,31 @@
 /* requires */
 
-var	gulp		= require('gulp'),
-	ifelse 		= require('gulp-if'),
-	util		= require('gulp-util'),
-	browserSync	= require('browser-sync'),
-	cache 		= require('gulp-cached'),
-	concat 		= require('gulp-concat'),
-	fileinclude	= require('gulp-file-include'),
-	rename 		= require('gulp-rename'),
-	uglify 		= require('gulp-uglify'),
-	url 		= require('gulp-css-url-adjuster'),
-	combinemq 	= require('gulp-combine-mq'),
-	imagemin 	= require('gulp-imagemin'),
-	pngquant 	= require('imagemin-pngquant'),
-	del 		= require('del'),
-	addsrc 		= require('gulp-add-src'),
-
-	sass 	 	= require('gulp-sass'),
-	importOnce	= require('node-sass-import-once'),
-	autoprefixr	= require('autoprefixer-core'),
-	postcss 	= require('gulp-postcss'),
-	minifyCSS	= require('gulp-minify-css');
+import url from "gulp-css-url-adjuster";
+import uglify from "gulp-uglify";
+import fileinclude from "gulp-file-include";
+import concat from "gulp-concat";
+import cache from "gulp-cached";
+import browserSync from "browser-sync";
+import ifelse from "gulp-if";
+import util from "gulp-util";
+import rename from "gulp-rename";
+import {deleteAsync} from 'del';
+import addsrc from "gulp-add-src";
+import importOnce from "node-sass-import-once";
+import autoprefixer from "autoprefixer";
+import postcss from "gulp-postcss";
+import gulp from "gulp";
+import gulpSass from 'gulp-sass';
+import sassCompiler from 'sass';
+const sass = gulpSass(sassCompiler);
 
 /* paths */
 
-var mask = {
+const mask = {
 		html: ['dev/html/**/*', 'dev/includes/*.html', 'dev/blocks/**/*.html'],
 		scss: 'dev/blocks/**/*.scss',
 		css: 'dev/css/**/*.css',
-		js_f: 'dev/js/**/*', 
+		js_f: 'dev/js/**/*',
 		js_b: 'dev/blocks/**/*.js',
 		images: 'dev/blocks/**/*.{jpg,png,gif,svg}',
 		files: 'dev/files/**/*',
@@ -48,73 +45,54 @@ var mask = {
 		files: 'public/files',
 		fonts: 'public/fonts'
 	},
-	isProduction = (util.env.type == 'production'),
-	isDeploy = (util.env.type == 'deploy');
+	isProduction = (util.env.type === 'production'),
+	isDeploy = (util.env.type === 'deploy');
 
-gulp.task('default', ['build', 'server', 'watch']);
-
-gulp.task('offline', ['build', 'serverOffline', 'watch']);
-
-gulp.task('build', ['html', 'scss', 'css', 'js', 'images', 'files', 'fonts']);
-
-gulp.task('html', function() {
+gulp.task('html', function(cb) {
 	gulp.src(input.html)
 		.pipe(fileinclude())
 		.on('error', util.log)
 		.pipe(cache('htmling'))
 		.pipe(gulp.dest(output.main))
 		.pipe(browserSync.stream());
+	cb();
 });
 
-gulp.task('scss', function() {
+gulp.task('scss', function(cb) {
 	gulp.src(input.scss)
-		.pipe(sass({
-			importer: importOnce
-		}).on('error', util.log))
+		.pipe(sass({importer: importOnce}, false).on('error', util.log))
 		.pipe(gulp.dest(input.css))
+	cb();
 });
 
-gulp.task('css', function() {
+gulp.task('css', function(cb) {
 	gulp.src(mask.css)
 		.pipe(cache('cssing'))
-		.pipe(postcss([ autoprefixr({ browsers: [ "> 1%" ] }) ]))
-		.pipe(url({ replace: [/^i-/, '../images/i-'] }))
-		.pipe(url({ replace: [/^f-/, '../fonts/f-'] }))
-		.pipe(ifelse(isProduction || isDeploy, 
-			combinemq({
-				beautify: false
-			})
-		))
-		.pipe(ifelse(isProduction, minifyCSS({
-			processImportFrom: ['local']
-		})))
+		.pipe(postcss([autoprefixer({browsers: ["> 1%"]})]))
+		.pipe(url({replace: [/^i-/, '../images/i-']}))
+		.pipe(url({replace: [/^f-/, '../fonts/f-']}))
 		.pipe(gulp.dest(output.css))
 		.pipe(browserSync.stream());
+	cb();
 });
 
-gulp.task('images', function() {
+gulp.task('images', function(cb) {
 	gulp.src(mask.images)
 		.pipe(cache('imaging'))
 		.pipe(rename({dirname: ''}))
-		.pipe(ifelse(isProduction || isDeploy, 
-			imagemin({
-				progressive: true,
-				svgoPlugins: [{removeViewBox: false}],
-				use: [pngquant()],
-				interlaced: true
-	        })
-		))
 		.pipe(gulp.dest(output.images))
 		.pipe(browserSync.stream());
+	cb();
 });
 
-gulp.task('files', function() {
-	gulp.src(mask.files) 
+gulp.task('files', function(cb) {
+	gulp.src(mask.files)
 		.pipe(gulp.dest(output.files))
 		.pipe(browserSync.stream());
+	cb();
 });
 
-gulp.task('js', function() {
+gulp.task('js', function(cb) {
 	gulp.src(mask.js_f)
 		.pipe(concat('main.js'))
 		.pipe(addsrc(mask.js_b))
@@ -123,16 +101,18 @@ gulp.task('js', function() {
 		.pipe(ifelse(isProduction || isDeploy, uglify()))
 		.pipe(gulp.dest(output.js))
 		.pipe(browserSync.stream());
+	cb();
 });
 
-gulp.task('fonts', function() {
-	gulp.src(mask.fonts) 
+gulp.task('fonts', function(cb) {
+	gulp.src(mask.fonts)
 		.pipe(rename({dirname: ''}))
 		.pipe(gulp.dest(output.fonts))
 		.pipe(browserSync.stream());
+	cb();
 });
 
-gulp.task('server', function() {
+gulp.task('server', function(cb) {
 	browserSync.init({
 		server: output.main,
 		open: false,
@@ -140,28 +120,24 @@ gulp.task('server', function() {
 		reloadOnRestart: true,
 		online: true
 	});
+	cb();
 });
 
-gulp.task('serverOffline', function() {
-	browserSync.init({
-		server: output.main,
-		open: false,
-		browser: "browser",
-		reloadOnRestart: true,
-		online: false
-	});
-});
-
-gulp.task('watch', function() {
-	gulp.watch(mask.html, ['html']);
-	gulp.watch(mask.scss, ['scss']);
-	gulp.watch(mask.css, ['css']);
-	gulp.watch([mask.js_f, mask.js_b], ['js']);
-	gulp.watch(mask.images, ['images']);
-	gulp.watch(mask.files, ['files']);
-	gulp.watch(mask.fonts, ['fonts']);
+gulp.task('watch', function(cb) {
+	gulp.watch(mask.html, gulp.series('html'));
+	gulp.watch(mask.scss, gulp.series('scss'));
+	gulp.watch(mask.css, gulp.series('css'));
+	gulp.watch([mask.js_f, mask.js_b], gulp.series('js'));
+	gulp.watch(mask.images, gulp.series('images'));
+	gulp.watch(mask.files, gulp.series('files'));
+	gulp.watch(mask.fonts, gulp.series('fonts'));
+	cb();
 });
 
 gulp.task('clean', function(cb) {
-	del(mask.main);
+	deleteAsync(mask.main);
+	cb();
 });
+
+gulp.task('build', gulp.series('html', 'scss', 'css', 'js', 'images', 'files', 'fonts'));
+gulp.task('default', gulp.series('build', 'server', 'watch'));
