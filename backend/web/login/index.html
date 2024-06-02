@@ -3,22 +3,22 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	
-	<title>Вход — uReadability</title>
-	
-	<link rel="shortcut icon" type="image/png" href="/files/favicon.png">
 
-	<link rel="stylesheet" href="/css/main.css">
+	<title>Вход — uReadability</title>
+
+	<link rel="shortcut icon" type="image/png" href="/favicon.png">
+
+	<link rel="stylesheet" href="/main.css">
 
 	<script src="https://code.jquery.com/jquery-4.0.0-beta.min.js"></script>
 
-	<script src="/js/main.js"></script>
+	<script src="/main.js"></script>
 </head>
 <body class="page">
 	<script>
-		var back = getParameterByName('back');
+		const back = getParameterByName('back');
 
-		if (login && password) {
+		if (localStorage.getItem('login') && localStorage.getItem('password')) {
 			if (back) {
 				location.href = back;
 			} else {
