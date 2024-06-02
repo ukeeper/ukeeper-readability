@@ -28,6 +28,9 @@
     GET /api/v1/rule?url=http://blah.com/aaa - get rule for url
     GET /api/v1/rules - get all rules, enabled and disabled
 
+    POST /api/v1/summarize {content: "text content"} - summarize main points from the content
+    POST /api/v1/content-correct {url: "http://aa.com/blah", selector: ".content"} - correct content parsing with a new selector
+
 #### testing
 
 on master (dev version) prefix /ureadability should be added
