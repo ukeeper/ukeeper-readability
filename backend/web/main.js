@@ -1,335 +1,339 @@
-var APIPath = '/api',
-	login = localStorage.getItem('login'),
-	password = localStorage.getItem('password'),
-	authHeaders = {
-		'Authorization': 'Basic ' + btoa(login + ':' + password)
-	},
-	isAdmin = login && password;
+const APIPath = '/api';
+const authHeaders = {
+    'Authorization': 'Basic ' + btoa(localStorage.getItem('login') + ':' + localStorage.getItem('password'))
+};
 
 function getParameterByName(name) {
     name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-        results = regex.exec(location.search);
+    const regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
+    const results = regex.exec(location.search);
 
     return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
-$(function() {
-	var $currentPage = $('.menu__item a[href="' + location.pathname + '"]');
 
-	$currentPage.parent().html($currentPage.text());
-});
-$(function() {
-	var $login = $('#login');
+document.addEventListener('DOMContentLoaded', () => {
+    const currentPage = document.querySelector('.menu__item a[href="' + location.pathname + '"]');
 
-	if ($login.length) {
-		$login.submit(function(event) {
-			$('.login__error', $login).hide();
+    if (currentPage) {
+        currentPage.parentNode.innerHTML = currentPage.textContent;
+    }
 
-			var login = $(this).find('input[name=login]').val(),
-				pass = $(this).find('input[name=password]').val()
+    const loginForm = document.getElementById('login');
 
-			if (login && pass) {
-				var request = new XMLHttpRequest();
+    if (loginForm) {
+        loginForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            document.querySelector('.login__error').style.display = 'none';
 
-				request.open('POST', APIPath + '/auth', true, login, pass);
-				request.setRequestHeader('Authorization', 'Basic ' + btoa(login + ':' + pass));
+            const login = loginForm.querySelector('input[name=login]').value;
+            const pass = loginForm.querySelector('input[name=password]').value;
 
-			    request.onreadystatechange = function(event) {
-			        if (request.readyState === 4) {
-			            if (request.status !== 200) {
-							$('#login .login__error').show();
-			            } else {
-							localStorage.setItem('login', login);
-							localStorage.setItem('password', pass);
+            if (login && pass) {
+                const request = new XMLHttpRequest();
 
-							var back = getParameterByName('back');
+                request.open('POST', APIPath + '/auth', true);
+                request.setRequestHeader('Authorization', 'Basic ' + btoa(login + ':' + pass));
 
-							if (back) {
-								location.href = back;
-							} else {
-								location.href = '/';
-							}
-			            }
-			        }
-			    };
+                request.onreadystatechange = function () {
+                    if (request.readyState === 4) {
+                        if (request.status !== 200) {
+                            document.querySelector('#login .login__error').style.display = 'block';
+                        } else {
+                            localStorage.setItem('login', login);
+                            localStorage.setItem('password', pass);
 
-			    request.send();
-			}
+                            const back = getParameterByName('back');
+                            location.href = back ? back : '/';
+                        }
+                    }
+                };
 
-			return false;
-		});
-	}
-});
-$(function() {
-	$('#logout').click(function(event) {
-		event.preventDefault();
+                request.send();
+            }
+        });
+    }
 
-		var request = new XMLHttpRequest();
+    const logoutButton = document.getElementById('logout');
 
-		request.open('POST', APIPath + '/auth', false, 'harry', 'colloportus');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
 
-		try {
-			request.send();
+            const request = new XMLHttpRequest();
 
-			if (request.readyState === 4) {
-				localStorage.removeItem('login');
-				localStorage.removeItem('password');
+            request.open('POST', APIPath + '/auth', false, 'harry', 'colloportus');
 
-				location.href = '/login/';
-			}
-		} catch (err) {
-			localStorage.removeItem('login');
-			localStorage.removeItem('password');
+            try {
+                request.send();
 
-			location.href = '/login/';
-		}
-	});
-});
-function loadPreview(url, $button) {
-	$button
-		.addClass('form__button_loading')
-		.attr('disabled', true);
+                if (request.readyState === 4) {
+                    localStorage.removeItem('login');
+                    localStorage.removeItem('password');
+                    location.href = '/login/';
+                }
+            } catch (err) {
+                localStorage.removeItem('login');
+                localStorage.removeItem('password');
+                location.href = '/login/';
+            }
+        });
+    }
 
-	$.ajax({
-		url: APIPath + '/extract',
-		type: 'POST',
-		async: true,
-		headers: authHeaders,
-		data: JSON.stringify({
-			url: url
-		})
-	})
-	.done(function(json) {
-		var $preview = $('#preview'),
-			map = {
-				title:        	'.preview__title',
-				content:      	'.preview__content',
-				rich_content: 	'.preview__rich-content',
-				excerpt:      	'.preview__excerpt',
-			};
+    function loadPreview(url, button) {
+        button.classList.add('form__button_loading');
+        button.disabled = true;
 
-		for (var prop in json) {
-			$(map[prop], $preview).html(json[prop]);
-		}
+        const request = new XMLHttpRequest();
+        request.open('POST', APIPath + '/extract', true);
+        request.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+        request.setRequestHeader('Authorization', authHeaders.Authorization);
 
-		$preview.show();
-		$('html,body').animate({
-			scrollTop: $preview.offset().top
-		}, 300);
-	})
-	.fail(function(response) {
-		console.log("error while loading preview");
-		console.log(response);
-	})
-	.always(function(response) {
-		$button
-			.removeClass('form__button_loading')
-			.attr('disabled', false);
+        request.onreadystatechange = function () {
+            if (request.readyState === 4) {
+                if (request.status === 200) {
+                    const json = JSON.parse(request.responseText);
+                    const preview = document.getElementById('preview');
+                    const map = {
+                        title: '.preview__title',
+                        content: '.preview__content',
+                        rich_content: '.preview__rich-content',
+                        excerpt: '.preview__excerpt',
+                    };
 
-		$('.form__loader').addClass('form__loader_hidden');
-	});
-}
+                    for (const prop in map) {
+                        if (json[prop]) {
+                            preview.querySelector(map[prop]).innerHTML = json[prop];
+                        }
+                    }
 
+                    preview.style.display = 'block';
+                    window.scrollTo({
+                        top: preview.offsetTop,
+                        behavior: 'smooth'
+                    });
+                } else {
+                    console.log("error while loading preview");
+                    console.log(request.responseText);
+                }
 
-$(function() {
-	var $rule = $('#rule'),
-		$newTestURLs = $('.rule__new-test-url', $rule),
-		$testURLs = $('.rule__test-urls', $rule);
+                button.classList.remove('form__button_loading');
+                button.disabled = false;
+                document.querySelector('.form__loader').classList.add('form__loader_hidden');
+            }
+        };
 
-	if ($rule.length) {
-		var id = getParameterByName('id'),
-			map = {
-				domain: '.rule__domain',
-				content: '.rule__content',
-				author: '.rule__author',
-				match_url: '.rule__match-urls',
-				excludes: '.rule__excludes',
-				test_urls: '.rule__test-urls'
-			},
-			textBoxes = [ 'match_url', 'excludes', 'test_urls'];
+        request.send(JSON.stringify({url: url}));
+    }
 
-		if (id.length) {
-			$.ajax({
-				url: APIPath + '/rule/' + id,
-				type: 'GET',
-				dataType: 'json'
-			})
-			.done(function(json) {
-				$rule.data('data', json);
+    const rule = document.getElementById('rule');
+    const testURLs = rule ? rule.querySelector('.rule__test-urls') : null;
 
-				for (var prop in map) {
-					var val = json[prop];
+    if (rule) {
+        const id = getParameterByName('id');
+        const map = {
+            domain: '.rule__domain',
+            content: '.rule__content',
+            author: '.rule__author',
+            match_url: '.rule__match-urls',
+            excludes: '.rule__excludes',
+            test_urls: '.rule__test-urls'
+        };
+        const textBoxes = ['match_url', 'excludes', 'test_urls'];
 
-					if (textBoxes.indexOf(prop) != -1) {
-						val = val.join('\n');
-					}
+        if (id) {
+            const request = new XMLHttpRequest();
+            request.open('GET', APIPath + '/rule/' + id, true);
+            request.responseType = 'json';
 
-					$(map[prop], $rule).val(val);
-				}
-			})
-			.fail(function(response) {
-				console.log("error while loading rule");
-				console.log(response);
-			});
-		}
+            request.onload = function () {
+                if (request.status === 200) {
+                    const json = request.response;
+                    rule.dataset.data = JSON.stringify(json);
 
-		$('.rule__button-save', $rule).click(function(event) {
-			var json = {};
-			var data = $rule.data('data');
+                    for (const prop in map) {
+                        let val = json[prop];
 
-			for (var prop in map) {
-				var val = $(map[prop], $rule).val();
+                        if (textBoxes.includes(prop)) {
+                            val = val.join('\n');
+                        }
 
-				if (textBoxes.indexOf(prop) != -1) {
-					val = val.split('\n');
-				}
+                        rule.querySelector(map[prop]).value = val;
+                    }
+                } else {
+                    console.log("error while loading rule");
+                    console.log(request.responseText);
+                }
+            };
 
-				json[prop] = val;
-			}
+            request.send();
+        }
 
-			if (id.length) {
-				json.enabled = data.enabled;
-				json.id = data.id;
-				json.user = data.user;
-			}
+        rule.querySelector('.rule__button-save').addEventListener('click', function () {
+            let json = {};
+            let data = {};
 
-			$.ajax({
-				url: APIPath + '/rule',
-				type: 'POST',
-				async: true,
-				headers: authHeaders,
-				data: JSON.stringify(json)
-			})
-			.done(function() {
-				location.href = '/';
-			})
-			.fail(function(response) {
-				console.log("error while saving the rule");
-				console.log(response);
-			});
-		});
+            if (rule.dataset.data) {
+                data = JSON.parse(rule.dataset.data);
+            }
 
-		$('.rule__button-show', $rule).click(function() {
-			var $tip = $(this).siblings('.form__button-tip')
-				$loader = $('.form__loader', $rule),
-				index = $testURLs
-						.val()
-						.substr(0, $testURLs[0].selectionStart)
-						.split('\n')
-						.length,
-				lines = $testURLs
-						.val()
-						.split('\n'),
-				url = lines[index - 1];
+            for (const prop in map) {
+                let val = rule.querySelector(map[prop]).value;
 
-			if (url.length) {
-				$tip.hide();
-				$loader.removeClass('form__loader_hidden');
-				loadPreview(url, $(this)); // preview.js
-			} else {
-				$tip.text('Выбрана пустая строка').show();
-			}
-		});
+                if (textBoxes.includes(prop)) {
+                    val = val.split('\n');
+                }
 
-		$('.form__input', $rule).keydown(function(e) {
-			if (e.ctrlKey && e.keyCode == 13) {
-				$('.rule__button-save', $rule).click();
-			}
-		});
-	}
-});
-$(function() {
-	if ($('#rules__list').length) {
-		loadRules();
-	};
+                json[prop] = val;
+            }
+
+            if (id) {
+                json.enabled = data.enabled;
+                json.id = data.id;
+                json.user = data.user;
+            }
+
+            const request = new XMLHttpRequest();
+            request.open('POST', APIPath + '/rule', true);
+            request.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+            request.setRequestHeader('Authorization', authHeaders.Authorization);
+
+            request.onreadystatechange = function () {
+                if (request.readyState === 4) {
+                    if (request.status === 200) {
+                        location.href = '/';
+                    } else {
+                        console.log("error while saving the rule");
+                        console.log(request.responseText);
+                    }
+                }
+            };
+
+            request.send(JSON.stringify(json));
+        });
+
+        rule.querySelector('.rule__button-show').addEventListener('click', function () {
+            const tip = this.nextElementSibling;
+            const loader = document.querySelector('.form__loader');
+            const index = testURLs.value.substring(0, testURLs.selectionStart).split('\n').length;
+            const lines = testURLs.value.split('\n');
+            const url = lines[index - 1];
+
+            if (url.length) {
+                tip.style.display = 'none';
+                loader.classList.remove('form__loader_hidden');
+                loadPreview(url, this);
+            } else {
+                tip.textContent = 'Выбрана пустая строка';
+                tip.style.display = 'block';
+            }
+        });
+
+        rule.querySelector('.form__input').addEventListener('keydown', function (e) {
+            if (e.ctrlKey && e.keyCode === 13) {
+                rule.querySelector('.rule__button-save').click();
+            }
+        });
+    }
+
+    if (document.getElementById('rules__list')) {
+        loadRules();
+    }
 });
 
 function loadRules() {
-	$('#rules__list').html('');
+    const rulesList = document.getElementById('rules__list');
+    rulesList.innerHTML = '';
 
-	$.ajax({
-		url: APIPath + '/rules',
-		type: 'GET',
-		dataType: 'json'
-	})
-	.done(function(json) {
-		var $row;
+    const request = new XMLHttpRequest();
+    request.open('GET', APIPath + '/rules', true);
+    request.responseType = 'json';
 
-		for (var i = 0; i < json.length; i++) {
-			$row = $('<tr/>', {
-				class: 'rules__row'
-			}).data('data', json[i]);
+    request.onload = function () {
+        if (request.status === 200) {
+            const json = request.response;
+            json.forEach(function (rule) {
+                const row = document.createElement('tr');
+                row.classList.add('rules__row');
+                row.dataset.data = JSON.stringify(rule);
 
-			$('<td/>', {
-				class: 'rules__domain-cell',
-				html: '<a href="/edit/?id=' + json[i].id + '" class="link">' + json[i].domain + '</a>'
-			}).appendTo($row);
+                const domainCell = document.createElement('td');
+                domainCell.classList.add('rules__domain-cell');
+                domainCell.innerHTML = '<a href="/edit/?id=' + rule.id + '" class="link">' + (rule.domain ? rule.domain : 'unspecified') + '</a>';
 
-			$('<td/>', {
-				class: 'rules__content-cell',
-				text: json[i].content
-			}).appendTo($row);
+                row.appendChild(domainCell);
 
-			$('<td/>', {
-				class: 'rules__enabled-cell',
-				html: '<input class="rules__enabled" type="checkbox" ' + ((json[i].enabled) ? 'checked' : '') + '>'
-			}).appendTo($row);
+                const contentCell = document.createElement('td');
+                contentCell.classList.add('rules__content-cell');
+                contentCell.textContent = rule.content;
+                row.appendChild(contentCell);
 
-			if (!json[i].enabled) {
-				$row.addClass('rules__row_disabled');
-			}
+                const enabledCell = document.createElement('td');
+                enabledCell.classList.add('rules__enabled-cell');
+                enabledCell.innerHTML = '<input class="rules__enabled" type="checkbox" ' + (rule.enabled ? 'checked' : '') + '>';
+                row.appendChild(enabledCell);
 
-			$('#rules__list').append($row);
-		};
+                if (!rule.enabled) {
+                    row.classList.add('rules__row_disabled');
+                }
 
+                rulesList.appendChild(row);
+            });
 
-		$('.rules__enabled').change(function(event) {
-			event.preventDefault();
+            document.querySelectorAll('.rules__enabled').forEach(function (checkbox) {
+                checkbox.addEventListener('change', function (event) {
+                    event.preventDefault();
+                    toggleRule(checkbox.closest('tr'));
+                });
+            });
+        } else {
+            console.log("error while loading rules");
+            console.log(request.responseText);
+        }
+    };
 
-			toggleRule($(this).closest('tr'));
-		});
-	})
-	.fail(function(response) {
-		console.log("error while loading rules");
-		console.log(response);
-	});
+    request.send();
 }
 
-function toggleRule($row) {
-	var data = $row.data('data');
+function toggleRule(row) {
+    const data = JSON.parse(row.dataset.data);
+    data.enabled = !data.enabled;
 
-	data.enabled = !data.enabled;
+    if (data.enabled) {
+        const request = new XMLHttpRequest();
+        request.open('POST', APIPath + '/rule', true);
+        request.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+        request.setRequestHeader('Authorization', authHeaders.Authorization);
 
-	if (data.enabled) {
-		$.ajax({
-			url: APIPath + '/rule',
-			type: 'POST',
-			async: true,
-			headers: authHeaders,
-			data: JSON.stringify(data)
-		})
-		.done(function() {
-			$row.data('data', data);
-			$row.removeClass('rules__row_disabled');
-		})
-		.fail(function(response) {
-			console.log("error while enabling the rule");
-			console.log(response);
-		});
-	} else {
-		$.ajax({
-			url: APIPath + '/rule/' + data.id,
-			type: 'DELETE',
-			async: true,
-			headers: authHeaders
-		})
-		.done(function() {
-			$row.data('data', data);
-			$row.addClass('rules__row_disabled');
-		})
-		.fail(function(response) {
-			console.log("error while disabling the rule");
-			console.log(response);
-		});
-	}
+        request.onreadystatechange = function () {
+            if (request.readyState === 4) {
+                if (request.status === 200) {
+                    row.dataset.data = JSON.stringify(data);
+                    row.classList.remove('rules__row_disabled');
+                } else {
+                    console.log("error while enabling the rule");
+                    console.log(request.responseText);
+                }
+            }
+        };
+
+        request.send(JSON.stringify(data));
+    } else {
+        const request = new XMLHttpRequest();
+        request.open('DELETE', APIPath + '/rule/' + data.id, true);
+        request.setRequestHeader('Authorization', authHeaders.Authorization);
+
+        request.onreadystatechange = function () {
+            if (request.readyState === 4) {
+                if (request.status === 200) {
+                    row.dataset.data = JSON.stringify(data);
+                    row.classList.add('rules__row_disabled');
+                } else {
+                    console.log("error while disabling the rule");
+                    console.log(request.responseText);
+                }
+            }
+        };
+
+        request.send();
+    }
 }
