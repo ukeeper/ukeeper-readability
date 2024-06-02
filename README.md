@@ -2,7 +2,7 @@
 
 ### Running instructions
 
-`docker-compose up` will leave you with working ukeeper-redabilty service (both API and frontend) running on <http://localhost:8080>.
+`docker-compose up` will leave you with working ukeeper-readability service (both API and frontend) running on <http://localhost:8080>.
 
 ### Configuration
 

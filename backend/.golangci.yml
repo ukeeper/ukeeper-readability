@@ -8,7 +8,6 @@ linters:
     - dupl
     - errcheck
     - exportloopref
-    - gas
     - gochecknoinits
     - goconst
     - gocritic
@@ -20,7 +19,6 @@ linters:
     - gosimple
     - govet
     - ineffassign
-    - megacheck
     - misspell
     - nakedret
     - revive
@@ -31,11 +29,9 @@ linters:
     - unconvert
     - unparam
     - unused
-    - unused
     - whitespace
   disable-all: true
 
 issues:
   exclude-dirs:
     - vendor
-    - readability

@@ -1,4 +1,4 @@
-// Package extractor uses altered version of go-readabilty and local rules to get articles
+// Package extractor uses mauidude/go-readability and local rules to get articles
 package extractor
 
 import (

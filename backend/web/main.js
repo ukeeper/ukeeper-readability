@@ -227,12 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 tip.style.display = 'block';
             }
         });
-
-        rule.querySelector('.form__input').addEventListener('keydown', function (e) {
-            if (e.ctrlKey && e.keyCode === 13) {
-                rule.querySelector('.rule__button-save').click();
-            }
-        });
     }
 
     if (document.getElementById('rules__list')) {
