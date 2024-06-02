@@ -22,16 +22,6 @@ RUN \
     echo "version=$version" && \
     go build -o ukeeper-readability -ldflags "-X main.revision=${version} -s -w" .
 
-FROM --platform=$BUILDPLATFORM node:22 as build-frontend
-
-ADD frontend /build
-WORKDIR /build
-
-RUN \
-	npm i --quiet -g gulp && \
-	npm i --quiet && \
-	gulp build
-
 # Run
 FROM umputun/baseimage:app-latest
 
@@ -42,7 +32,7 @@ LABEL org.opencontainers.image.source="https://github.com/ukeeper/ukeeper-readab
 RUN apk add --update ca-certificates && update-ca-certificates
 
 COPY --from=build-backend /build/backend/ukeeper-readability /srv/
-COPY --from=build-frontend /build/public /srv/web
+ADD ./backend/web /srv/web
 
 RUN chown -R app:app /srv
 USER app
