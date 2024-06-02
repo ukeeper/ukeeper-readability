@@ -287,21 +287,6 @@
 .rule__tip-error {
   text-align: center;
 }
-
-.link, .preview__data a {
-  border-bottom: 1px solid rgba(0, 96, 160, 0.2);
-  color: #0060a0;
-  text-decoration: none;
-  transition: all 0.5s;
-  outline: none;
-}
-.link:hover, .preview__data a:hover {
-  border-color: rgba(224, 80, 32, 0.9);
-  color: #e05020;
-  fill: #e05020;
-  transition: all 0ms;
-}
-
 .preview {
   display: none;
   max-width: 90%;

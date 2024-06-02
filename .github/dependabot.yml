@@ -13,10 +13,6 @@ updates:
       "GitHub Actions updates":
         patterns:
           - "*"
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "monthly"
   - package-ecosystem: "gomod"
     directory: "/backend"
     schedule:
@@ -24,14 +20,3 @@ updates:
     groups:
       "Go modules updates":
         dependency-type: "production"
-      "Go modules updates for tests":
-        dependency-type: "development"
-  - package-ecosystem: "npm"
-    directory: "/frontend"
-    schedule:
-      interval: "monthly"
-    groups:
-      "NPM modules updates":
-        dependency-type: "production"
-      "NPM development modules updates":
-        dependency-type: "development"

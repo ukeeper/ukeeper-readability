@@ -1,6 +1,19 @@
-@@include('../../includes/head.html',{
-	"title": "Вход — uReadability"
-})
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<title>Вход — uReadability</title>
+	
+	<link rel="shortcut icon" type="image/png" href="/files/favicon.png">
+
+	<link rel="stylesheet" href="/css/main.css">
+
+	<script src="https://code.jquery.com/jquery-4.0.0-beta.min.js"></script>
+
+	<script src="/js/main.js"></script>
+</head>
 <body class="page">
 	<script>
 		var back = getParameterByName('back');
@@ -27,6 +40,8 @@
 		</form>
 	</div>
 
-	@@include('../../blocks/footer/footer.html')
+	<div class="footer wrapper page__footer">
+	<a href="#" class="link footer__copyright">uReadability</a>, <script>document.write((new Date()).getFullYear().toString());</script>
+</div>
 </body>
 </html>
