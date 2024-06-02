@@ -3,34 +3,31 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	
+
 	<title>Добавление правила — uReadability</title>
 
 	<script>
-		var login = localStorage.getItem('login'),
-			pass = localStorage.getItem('password');
-
-		if (! (login && pass)) {
+		if (! (localStorage.getItem('login') && localStorage.getItem('password'))) {
 			location.href = '/login/?back=' + location.href;
 		}
 	</script>
-	
-	<link rel="shortcut icon" type="image/png" href="/files/favicon.png">
 
-	<link rel="stylesheet" href="/css/main.css">
+	<link rel="shortcut icon" type="image/png" href="/favicon.png">
+
+	<link rel="stylesheet" href="/main.css">
 
 	<script src="https://code.jquery.com/jquery-4.0.0-beta.min.js"></script>
 
-	<script src="/js/main.js"></script>
+	<script src="/main.js"></script>
 </head>
 <body class="page">
-	
+
 	<div class="header wrapper page__header">
 	<a href="/" class="header__title link">uReadability</a>
 	<ul class="menu header__menu">
 		<li class="menu__item menu__item_right"><a href="#logout" id="logout" class="link">Выйти</a></li>
 	</ul>
-</div> 
+</div>
 
 	<div class="wrapper">
 		<div class="rule form page__rule" id="rule">
@@ -69,7 +66,7 @@
 	<input type="button" class="form__button rule__button-save" value="Сохранить">
 
 	<div class="form__loader form__loader_hidden"></div>
-</div> 
+</div>
 		<div class="preview" id="preview">
 	<div class="preview__tip">Название:</div>
 	<div class="preview__title preview__data"></div>
