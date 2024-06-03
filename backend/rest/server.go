@@ -79,6 +79,18 @@ func (s *Server) routes(frontendDir string) chi.Router {
 			protected.Post("/rule", s.saveRule)
 			protected.Delete("/rule/{id}", s.deleteRule)
 		})
+
+		// New secured endpoint for summarizing main points
+		r.Group(func(protected chi.Router) {
+			protected.Use(basicAuth("ureadability", s.Credentials))
+			protected.Post("/v1/summarize", s.summarizeMainPoints)
+		})
+
+		// New secured endpoint for content correction and re-extraction
+		r.Group(func(protected chi.Router) {
+			protected.Use(basicAuth("ureadability", s.Credentials))
+			protected.Post("/v1/content-correct", s.contentParsedWrong)
+		})
 	})
 
 	fs, err := UM.NewFileServer("/", frontendDir, UM.FsOptSPA)
@@ -222,6 +234,16 @@ func (s *Server) deleteRule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) authFake(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
 	render.JSON(w, r, JSON{"pong": t.Format("20060102150405")})
+}
+
+// summarizeMainPoints handles the summarization of main points from the content.
+func (s *Server) summarizeMainPoints(w http.ResponseWriter, r *http.Request) {
+	// Implementation for summarizing main points using ChatGPT
+}
+
+// contentParsedWrong handles the correction of content parsing using ChatGPT.
+func (s *Server) contentParsedWrong(w http.ResponseWriter, r *http.Request) {
+	// Implementation for correcting content parsing using ChatGPT
 }
 
 func getBid(id string) primitive.ObjectID {
