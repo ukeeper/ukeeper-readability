@@ -27,6 +27,7 @@ var opts struct {
 	MongoURI    string            `short:"m" long:"mongo-uri" env:"MONGO_URI" required:"true" description:"MongoDB connection string"`
 	MongoDelay  time.Duration     `long:"mongo-delay" env:"MONGO_DELAY" default:"0" description:"mongo initial delay"`
 	MongoDB     string            `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
+	OpenAIKey   string            `long:"openai_key" env:"OPENAI_KEY" description:"OpenAI API key for summary generation"`
 	Debug       bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
 }
 
@@ -52,6 +53,7 @@ func main() {
 			TimeOut:     30 * time.Second,
 			SnippetSize: 300,
 			Rules:       stores.Rules,
+			OpenAIKey:   opts.OpenAIKey,
 		},
 		Token:       opts.Token,
 		Credentials: opts.Credentials,

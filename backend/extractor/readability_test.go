@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -206,4 +207,62 @@ func TestGetContentCustom(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, content, 6988)
 	assert.Len(t, rich, 7169)
+}
+
+func TestUReadability_GenerateSummary(t *testing.T) {
+	mockOpenAI := &OpenAIClientMock{
+		CreateChatCompletionFunc: func(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{
+					{
+						Message: openai.ChatCompletionMessage{
+							Content: "This is a summary of the article.",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	tests := []struct {
+		name           string
+		content        string
+		openAIKey      string
+		expectedResult string
+		expectedError  string
+	}{
+		{
+			name:           "Valid OpenAI Key and content",
+			content:        "This is a test article content.",
+			openAIKey:      "test-key",
+			expectedResult: "This is a summary of the article.",
+			expectedError:  "",
+		},
+		{
+			name:           "No OpenAI Key",
+			content:        "This is a test article content.",
+			openAIKey:      "",
+			expectedResult: "",
+			expectedError:  "OpenAI key is not set",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			readability := UReadability{
+				OpenAIKey:    tt.openAIKey,
+				openAIClient: mockOpenAI,
+			}
+
+			result, err := readability.GenerateSummary(context.Background(), tt.content)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedResult, result)
+			}
+		})
+	}
 }

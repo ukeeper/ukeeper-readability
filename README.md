@@ -12,6 +12,7 @@
 | port         | UKEEPER_PORT    | `8080`         | web server port                                       |
 | mongo-uri    | MONGO_URI       | none           | MongoDB connection string, _required_                 |
 | frontend-dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files                         |
+| openai_key   | OPENAI_KEY      | none           | OpenAI API key for summary generation                 |
 | token        | TOKEN           | none           | token for /content/v1/parser endpoint auth            |
 | mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                                   |
 | mongo-db     | MONGO_DB        | `ureadability` | mongo database name                                   |
@@ -20,7 +21,7 @@
 
 ### API
 
-    GET /api/content/v1/parser?token=secret&url=http://aa.com/blah - extract content (emulate Readability API parse call)
+    GET /api/content/v1/parser?token=secret&summary=true&url=http://aa.com/blah - extract content (emulate Readability API parse call), summary is optional and requires OpenAI key and token to be enabled
     POST /api/v1/extract {url: http://aa.com/blah}  - extract content
 
 ## Development

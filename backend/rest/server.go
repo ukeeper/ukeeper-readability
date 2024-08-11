@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -176,10 +177,25 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
+	summary, _ := strconv.ParseBool(r.URL.Query().Get("summary"))
 
 	if s.Token != "" && token == "" {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
 		return
+	}
+
+	// Check if summary is requested but token is not provided, or OpenAI key is not set
+	if summary {
+		if s.Readability.OpenAIKey == "" {
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, JSON{"error": "OpenAI key is not set"})
+			return
+		}
+		if s.Token == "" {
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, JSON{"error": "summary generation requires token, but token is not set for the server"})
+			return
+		}
 	}
 
 	if s.Token != "" && s.Token != token {
@@ -197,6 +213,16 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 	if err != nil {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, err, "can't extract content")
 		return
+	}
+
+	if summary {
+		summaryText, err := s.Readability.GenerateSummary(r.Context(), res.Content)
+		if err != nil {
+			render.Status(r, http.StatusInternalServerError)
+			render.JSON(w, r, JSON{"error": fmt.Sprintf("failed to generate summary: %v", err)})
+			return
+		}
+		res.Summary = summaryText
 	}
 
 	rest.RenderJSON(w, &res)
@@ -238,6 +264,13 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		if s.Readability.OpenAIKey != "" {
+			result.Summary, e = s.Readability.GenerateSummary(r.Context(), result.Content)
+			if e != nil {
+				log.Printf("[WARN] failed to generate summary for preview of %s: %v", url, e)
+			}
+		}
+
 		responses = append(responses, *result)
 	}
 
@@ -248,6 +281,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		Excerpt string
 		Rich    template.HTML
 		Content string
+		Summary template.HTML
 	}
 
 	results := make([]result, 0, len(responses))
@@ -259,6 +293,8 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			//nolint:gosec // this content is escaped by Extractor, so it's safe to use it as is
 			Rich:    template.HTML(r.Rich),
 			Content: r.Content,
+			//nolint: gosec // we do not expect CSS from OpenAI response
+			Summary: template.HTML(strings.ReplaceAll(r.Summary, "\n", "<br>")),
 		})
 	}
 

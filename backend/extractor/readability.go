@@ -14,10 +14,16 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
+	"github.com/sashabaranov/go-openai"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-readability/backend/datastore"
 )
+
+//go:generate moq -out openai_mock.go . OpenAIClient
+type OpenAIClient interface {
+	CreateChatCompletion(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
+}
 
 // Rules interface with all methods to access datastore
 type Rules interface {
@@ -33,10 +39,14 @@ type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Rules       Rules
+	OpenAIKey   string
+
+	openAIClient OpenAIClient
 }
 
 // Response from api calls
 type Response struct {
+	Summary     string   `json:"summary,omitempty"`
 	Content     string   `json:"content"`
 	Rich        string   `json:"rich_content"`
 	Domain      string   `json:"domain"`
@@ -68,6 +78,37 @@ func (f *UReadability) Extract(ctx context.Context, reqURL string) (*Response, e
 // ExtractByRule fetches page and retrieves article using a specific rule
 func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	return f.extractWithRules(ctx, reqURL, rule)
+}
+
+func (f *UReadability) GenerateSummary(ctx context.Context, content string) (string, error) {
+	if f.OpenAIKey == "" {
+		return "", fmt.Errorf("OpenAI key is not set")
+	}
+	if f.openAIClient == nil {
+		f.openAIClient = openai.NewClient(f.OpenAIKey)
+	}
+	resp, err := f.openAIClient.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: openai.GPT4o,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "You are a helpful assistant that summarizes articles. Please summarize the main points in a few sentences as TLDR style (don't add a TLDR label). Then, list up to five detailed bullet points. Provide the response in plain text. Do not add any additional information. Do not add a Summary at the beginning of the response. If detailed bullet points are too similar to the summary, don't include them at all:",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: content,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Choices[0].Message.Content, nil
 }
 
 // ExtractWithRules is the core function that handles extraction with or without a specific rule
