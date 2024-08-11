@@ -12,7 +12,7 @@ import (
 )
 
 // get clean text from html content
-func (f UReadability) getText(content, title string) string {
+func (f *UReadability) getText(content, title string) string {
 	cleanText := sanitize.HTML(content)
 	cleanText = strings.Replace(cleanText, title, "", 1) // get rid of title in snippet
 	cleanText = strings.ReplaceAll(cleanText, "\t", " ")
@@ -32,7 +32,7 @@ func (f UReadability) getText(content, title string) string {
 }
 
 // get snippet from clean text content
-func (f UReadability) getSnippet(cleanText string) string {
+func (f *UReadability) getSnippet(cleanText string) string {
 	cleanText = strings.ReplaceAll(cleanText, "\n", " ")
 	size := len([]rune(cleanText))
 	if size > f.SnippetSize {
@@ -50,7 +50,7 @@ func (f UReadability) getSnippet(cleanText string) string {
 }
 
 // detect encoding, content type and convert content to utf8
-func (f UReadability) toUtf8(content []byte, header http.Header) (contentType, origEncoding, result string) {
+func (f *UReadability) toUtf8(content []byte, header http.Header) (contentType, origEncoding, result string) {
 	getContentTypeAndEncoding := func(str string) (contentType, encoding string) { // from "text/html; charset=windows-1251"
 		elems := strings.Split(str, ";")
 		contentType = strings.TrimSpace(elems[0])

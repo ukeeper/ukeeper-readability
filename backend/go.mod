@@ -15,6 +15,7 @@ require (
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
+	github.com/sashabaranov/go-openai v1.32.0
 	github.com/stretchr/testify v1.9.0
 	go.mongodb.org/mongo-driver v1.16.1
 	golang.org/x/net v0.28.0
