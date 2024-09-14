@@ -63,7 +63,7 @@ func (r RulesDAO) GetByID(ctx context.Context, id primitive.ObjectID) (Rule, boo
 	return rule, err == nil
 }
 
-// Save upsert rule and returns one with ID for inserted one only
+// Save upsert rule
 func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
 	ch, err := r.Collection.UpdateOne(ctx, bson.M{"domain": rule.Domain}, bson.M{"$set": rule}, options.Update().SetUpsert(true))
 	if err != nil {
@@ -72,6 +72,14 @@ func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
 	}
 	if ch.UpsertedID != nil {
 		rule.ID = ch.UpsertedID.(primitive.ObjectID)
+	}
+	// if rule was updated, we have no id, so try to find it by domain
+	if rule.ID == primitive.NilObjectID {
+		var found Rule
+		err = r.Collection.FindOne(ctx, bson.M{"domain": rule.Domain}).Decode(&found)
+		if err == nil {
+			rule.ID = found.ID
+		}
 	}
 	return rule, err
 }
@@ -84,12 +92,12 @@ func (r RulesDAO) Disable(ctx context.Context, id primitive.ObjectID) error {
 
 // All returns list of all rules, both enabled and disabled
 func (r RulesDAO) All(ctx context.Context) []Rule {
-	result := []Rule{}
 	cursor, err := r.Collection.Find(ctx, bson.M{})
 	if err != nil {
 		log.Printf("[WARN] failed to retrieve all rules, error=%v", err)
 		return []Rule{}
 	}
+	var result []Rule
 	if err = cursor.All(ctx, &result); err != nil {
 		log.Printf("[WARN] failed to retrieve all rules, error=%v", err)
 		return []Rule{}

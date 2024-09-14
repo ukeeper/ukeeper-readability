@@ -2,12 +2,15 @@ package datastore
 
 import (
 	"context"
+	"math/rand/v2"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyz"
 
 func TestRules(t *testing.T) {
 	if _, ok := os.LookupEnv("ENABLE_MONGO_TESTS"); !ok {
@@ -19,7 +22,7 @@ func TestRules(t *testing.T) {
 	rules := server.GetStores()
 	assert.NotNil(t, rules)
 	rule := Rule{
-		Domain:  "example.com",
+		Domain:  randStringBytesRmndr(42) + ".com",
 		Enabled: true,
 	}
 
@@ -27,15 +30,17 @@ func TestRules(t *testing.T) {
 	srule, err := rules.Save(context.Background(), rule)
 	assert.NoError(t, err)
 	assert.Equal(t, rule.Domain, srule.Domain)
+	ruleID := srule.ID
 
-	// get the rule we just saved
+	// get the rule we just saved by domain
 	grule, found := rules.Get(context.Background(), "https://"+rule.Domain)
 	assert.True(t, found)
 	assert.Equal(t, rule.Domain, grule.Domain)
+	assert.Equal(t, ruleID, grule.ID)
 	assert.Contains(t, rules.All(context.Background()), grule)
 
-	// get the rule by ID (available after Get call)
-	idrule, found := rules.GetByID(context.Background(), grule.ID)
+	// get the rule by ID
+	idrule, found := rules.GetByID(context.Background(), ruleID)
 	assert.True(t, found)
 	assert.Equal(t, grule, idrule)
 
@@ -56,6 +61,12 @@ func TestRules(t *testing.T) {
 	grule, found = rules.Get(context.Background(), "https://"+rule.Domain)
 	assert.False(t, found)
 	assert.Empty(t, grule.Domain)
+
+	// save a rule once more, should result in the same ID
+	updatedRule, err := rules.Save(context.Background(), rule)
+	assert.NoError(t, err)
+	assert.Equal(t, rule.Domain, updatedRule.Domain)
+	assert.Equal(t, ruleID, updatedRule.ID)
 }
 
 func TestRulesCanceledContext(t *testing.T) {
@@ -89,4 +100,13 @@ func TestRulesCanceledContext(t *testing.T) {
 	grule, found = rules.GetByID(ctx, rule.ID)
 	assert.Empty(t, grule)
 	assert.False(t, found)
+}
+
+// thanks to https://stackoverflow.com/a/31832326/961092
+func randStringBytesRmndr(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Int64()%int64(len(letterBytes))]
+	}
+	return string(b)
 }
