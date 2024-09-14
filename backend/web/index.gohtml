@@ -1,0 +1,25 @@
+{{define "content"}}
+  <div class="rules">
+    <table class="rules__table">
+      <thead>
+      <tr>
+        <th>Домен</th>
+        <th>Контент</th>
+        <th>Активность</th>
+      </tr>
+      </thead>
+      <tbody id="rules__list">
+      {{range .Rules}}
+          {{template "rule-row" .}}
+      {{end}}
+      </tbody>
+      <tfoot>
+      <tr>
+        <td colspan="3" class="rules__add">
+          <a href="/add/" class="link">Добавить</a>
+        </td>
+      </tr>
+      </tfoot>
+    </table>
+  </div>
+{{end}}

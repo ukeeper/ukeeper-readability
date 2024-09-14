@@ -1,0 +1,14 @@
+{{define "rule-row"}}
+  <tr class="rules__row {{if not .Enabled}}rules__row_disabled{{end}}" data-id="{{.ID.Hex}}">
+    <td class="rules__domain-cell">
+      <a href="/edit?id={{.ID.Hex}}" class="link">{{if .Domain}}{{.Domain}}{{else}}unspecified{{end}}</a>
+    </td>
+    <td class="rules__content-cell">{{.Content}}</td>
+    <td class="rules__enabled-cell">
+      <input class="rules__enabled" type="checkbox" {{if .Enabled}}checked{{end}}
+             hx-post="/api/toggle-rule/{{.ID.Hex}}"
+             hx-swap="outerHTML"
+             hx-target="closest tr">
+    </td>
+  </tr>
+{{end}}
