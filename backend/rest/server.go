@@ -5,7 +5,10 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
+	"html/template"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/didip/tollbooth/v7"
@@ -28,6 +31,8 @@ type Server struct {
 	Version     string
 	Token       string
 	Credentials map[string]string
+
+	indexPage *template.Template
 }
 
 // JSON is a map alias, just for convenience
@@ -37,6 +42,9 @@ type JSON map[string]interface{}
 func (s *Server) Run(ctx context.Context, address string, port int, frontendDir string) {
 	log.Printf("[INFO] activate rest server on %s:%d", address, port)
 
+	_ = os.Mkdir(filepath.Join(frontendDir, "components"), 0o700)
+	t := template.Must(template.ParseGlob(filepath.Join(frontendDir, "components", "*.gohtml")))
+	s.indexPage = template.Must(template.Must(t.Clone()).ParseFiles(filepath.Join(frontendDir, "index.gohtml")))
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", address, port),
 		Handler:           s.routes(frontendDir),
@@ -78,18 +86,37 @@ func (s *Server) routes(frontendDir string) chi.Router {
 		r.Group(func(protected chi.Router) {
 			protected.Use(basicAuth("ureadability", s.Credentials))
 			protected.Post("/rule", s.saveRule)
-			protected.Delete("/rule/{id}", s.deleteRule)
+			protected.Post("/toggle-rule/{id}", s.toggleRule)
 		})
 	})
 
-	fs, err := UM.NewFileServer("/", frontendDir, UM.FsOptSPA)
+	router.Get("/", s.handleIndex)
+
+	_ = os.Mkdir(filepath.Join(frontendDir, "static"), 0o700)
+	fs, err := UM.NewFileServer("/", filepath.Join(frontendDir, "static"), UM.FsOptSPA)
 	if err != nil {
-		log.Fatalf("unable to create, %v", err)
+		log.Fatalf("unable to create file server, %v", err)
 	}
 	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
 	})
 	return router
+}
+
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	rules := s.Readability.Rules.All(r.Context())
+	data := struct {
+		Title string
+		Rules []datastore.Rule
+	}{
+		Title: "Правила",
+		Rules: rules,
+	}
+	err := s.indexPage.ExecuteTemplate(w, "base.gohtml", data)
+	if err != nil {
+		log.Printf("[WARN] failed to render index template, %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
@@ -132,14 +159,14 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 		return
 	}
 
-	url := r.URL.Query().Get("url")
-	if url == "" {
+	extractURL := r.URL.Query().Get("url")
+	if extractURL == "" {
 		render.Status(r, http.StatusExpectationFailed)
 		render.JSON(w, r, JSON{"error": "no url passed"})
 		return
 	}
 
-	res, err := s.Readability.Extract(r.Context(), url)
+	res, err := s.Readability.Extract(r.Context(), extractURL)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, JSON{"error": err.Error()})
@@ -207,16 +234,33 @@ func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, &srule)
 }
 
-// deleteRule marks rule as disabled
-func (s *Server) deleteRule(w http.ResponseWriter, r *http.Request) {
+func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
 	id := getBid(chi.URLParam(r, "id"))
-	err := s.Readability.Rules.Disable(r.Context(), id)
-	if err != nil {
-		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, JSON{"error": err.Error()})
+	rule, found := s.Readability.Rules.GetByID(r.Context(), id)
+	if !found {
+		log.Printf("[WARN] rule not found for id: %s", id.Hex())
+		http.Error(w, "Rule not found", http.StatusNotFound)
 		return
 	}
-	render.JSON(w, r, JSON{"disabled": id})
+
+	rule.Enabled = !rule.Enabled
+	var err error
+	if rule.Enabled {
+		_, err = s.Readability.Rules.Save(r.Context(), rule)
+	} else {
+		err = s.Readability.Rules.Disable(r.Context(), id)
+	}
+
+	if err != nil {
+		log.Printf("[ERROR] failed to toggle rule: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = s.indexPage.ExecuteTemplate(w, "rule-row", rule)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // authFake just a dummy post request used for external check for protected resource

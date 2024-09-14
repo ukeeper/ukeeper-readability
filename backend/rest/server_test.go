@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +31,7 @@ func TestServer_FileServer(t *testing.T) {
 	}
 	testHTMLName := "test-ureadability.html"
 	dir := os.TempDir()
-	testHTMLFile := dir + "/" + testHTMLName
+	testHTMLFile := filepath.Join(dir, testHTMLName)
 	err := os.WriteFile(testHTMLFile, []byte("some html"), 0o700)
 	require.NoError(t, err)
 
@@ -40,10 +42,21 @@ func TestServer_FileServer(t *testing.T) {
 	ts := httptest.NewServer(srv.routes(dir))
 	defer ts.Close()
 
+	// no file served because it's outside of static dir
 	body, code := get(t, ts.URL+"/"+testHTMLName)
+	assert.Equal(t, http.StatusNotFound, code)
+	assert.Contains(t, body, "404 page not found")
+	ts.Close()
+
+	_ = os.Mkdir(filepath.Join(dir, "static"), 0o700)
+	require.NoError(t, os.Rename(testHTMLFile, filepath.Join(dir, "static", testHTMLName)))
+
+	ts = httptest.NewServer(srv.routes(dir))
+	body, code = get(t, ts.URL+"/"+testHTMLName)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "some html", body)
-	_ = os.Remove(testHTMLFile)
+	require.NoError(t, os.Remove(filepath.Join(dir, "static", testHTMLName)))
+	require.NoError(t, os.Remove(filepath.Join(dir, "static")))
 }
 
 func TestServer_Shutdown(t *testing.T) {
@@ -60,7 +73,7 @@ func TestServer_Shutdown(t *testing.T) {
 	}()
 
 	st := time.Now()
-	srv.Run(ctx, "127.0.0.1", 0, ".")
+	srv.Run(ctx, "127.0.0.1", 0, "../web")
 	assert.True(t, time.Since(st).Seconds() < 1, "should take about 100ms")
 	<-done
 }
@@ -263,7 +276,7 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	assert.NotEmpty(t, b)
 
 	// disable the rule
-	r, err = del(t, ts.URL+"/api/rule/"+fmt.Sprintf(`%s`, rule.ID.Hex()))
+	r, err = post(t, ts.URL+"/api/toggle-rule/"+rule.ID.Hex(), "")
 	assert.NoError(t, err)
 	// read body for error message
 	body, err := io.ReadAll(r.Body)
@@ -357,6 +370,81 @@ func TestServer_FakeAuth(t *testing.T) {
 	assert.Equal(t, "{\"error\":\"not found\"}\n", b)
 }
 
+func TestServer_HandleIndex(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+	randomDomainName := randStringBytesRmndr(42) + ".com"
+
+	// Add a test rule
+	_, err := post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "test content"}`, randomDomainName))
+	require.NoError(t, err)
+
+	// Test index page
+	resp, err := http.Get(ts.URL + "/")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(body), randomDomainName)
+	assert.Contains(t, string(body), "test content")
+	assert.Contains(t, string(body), "Правила")
+}
+
+func TestServer_ToggleRule(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+	randomDomainName := randStringBytesRmndr(42) + ".com"
+
+	// Add a test rule
+	r, err := post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "test content"}`, randomDomainName))
+	require.NoError(t, err)
+	var rule datastore.Rule
+	err = json.NewDecoder(r.Body).Decode(&rule)
+	require.NoError(t, err)
+	assert.Equal(t, randomDomainName, rule.Domain)
+	assert.Equal(t, "test content", rule.Content)
+	assert.True(t, rule.Enabled)
+
+	// Toggle rule (disable)
+	r, err = post(t, ts.URL+"/api/toggle-rule/"+rule.ID.Hex(), "")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, r.StatusCode)
+
+	body, err := io.ReadAll(r.Body)
+	require.NoError(t, err)
+	assert.NoError(t, r.Body.Close())
+	assert.Contains(t, string(body), `class="rules__row rules__row_disabled"`, string(body))
+
+	// Toggle rule again (enable)
+	r, err = post(t, ts.URL+"/api/toggle-rule/"+rule.ID.Hex(), "")
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, r.StatusCode)
+
+	body, err = io.ReadAll(r.Body)
+	require.NoError(t, err)
+	assert.NoError(t, r.Body.Close())
+	assert.NotContains(t, string(body), `class="rules__row rules__row_disabled"`)
+}
+
+func TestServer_ToggleRuleNotFound(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+
+	// Toggle rule (disable)
+	r, err := post(t, ts.URL+"/api/toggle-rule/non-existing", "")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, r.StatusCode)
+
+	body, err := io.ReadAll(r.Body)
+	require.NoError(t, err)
+	assert.NoError(t, r.Body.Close())
+	assert.Contains(t, string(body), `Rule not found`, string(body))
+}
+
 func get(t *testing.T, url string) (response string, statusCode int) {
 	r, err := http.Get(url)
 	assert.NoError(t, err)
@@ -396,7 +484,11 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 		Version:     "dev-test",
 	}
 
-	return httptest.NewServer(srv.routes(".")), &srv
+	webDir := "../web"
+	templates := template.Must(template.ParseGlob(filepath.Join(webDir, "components", "*.gohtml")))
+	srv.indexPage = template.Must(template.Must(templates.Clone()).ParseFiles(filepath.Join(webDir, "index.gohtml")))
+
+	return httptest.NewServer(srv.routes(webDir)), &srv
 }
 
 // thanks to https://stackoverflow.com/a/31832326/961092
