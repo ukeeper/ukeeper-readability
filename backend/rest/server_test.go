@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,6 +20,8 @@ import (
 	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 	"github.com/ukeeper/ukeeper-redabilty/backend/extractor"
 )
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyz"
 
 func TestServer_FileServer(t *testing.T) {
 	if _, ok := os.LookupEnv("ENABLE_MONGO_TESTS"); !ok {
@@ -88,7 +91,6 @@ func TestServer_WrongAuth(t *testing.T) {
 	require.NoError(t, err)
 	assert.NoError(t, r.Body.Close())
 	assert.Equal(t, http.StatusUnauthorized, r.StatusCode)
-
 }
 
 func TestServer_Extract(t *testing.T) {
@@ -222,26 +224,30 @@ func TestServer_LegacyExtract(t *testing.T) {
 func TestServer_RuleHappyFlow(t *testing.T) {
 	ts, _ := startupT(t)
 	defer ts.Close()
+	randomDomainName := randStringBytesRmndr(42) + ".com"
 
 	// save a rule
-	r, err := post(t, ts.URL+"/api/rule", `{"domain": "example.com"}`)
+	r, err := post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "test content"}`, randomDomainName))
 	require.NoError(t, err)
 	rule := datastore.Rule{}
 	err = json.NewDecoder(r.Body).Decode(&rule)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, r.StatusCode)
 	assert.NoError(t, r.Body.Close())
-	assert.Equal(t, "example.com", rule.Domain)
+	assert.Equal(t, randomDomainName, rule.Domain)
+	assert.Equal(t, "test content", rule.Content)
+	ruleID := rule.ID.Hex()
 
 	// get the rule we just saved
-	b, code := get(t, ts.URL+"/api/rule?url=https://example.com")
+	b, code := get(t, ts.URL+"/api/rule?url=https://"+randomDomainName)
 	assert.Equal(t, http.StatusOK, code)
 	rule = datastore.Rule{}
 	err = json.Unmarshal([]byte(b), &rule)
 	require.NoError(t, err)
-	assert.Equal(t, "example.com", rule.Domain)
+	assert.Equal(t, randomDomainName, rule.Domain)
+	assert.Equal(t, "test content", rule.Content)
 	assert.True(t, rule.Enabled)
-	ruleID := rule.ID.Hex()
+	assert.Equal(t, ruleID, rule.ID.Hex())
 
 	// check the rule presence in "all" list
 	b, code = get(t, ts.URL+"/api/rules")
@@ -257,8 +263,12 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	assert.NotEmpty(t, b)
 
 	// disable the rule
-	r, err = del(t, ts.URL+"/api/rule/"+fmt.Sprintf(`%s`, ruleID))
+	r, err = del(t, ts.URL+"/api/rule/"+fmt.Sprintf(`%s`, rule.ID.Hex()))
 	assert.NoError(t, err)
+	// read body for error message
+	body, err := io.ReadAll(r.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, r.StatusCode, string(body))
 	assert.NoError(t, r.Body.Close())
 
 	// get the rule by ID, should be marked as disabled
@@ -267,7 +277,8 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	rule = datastore.Rule{}
 	err = json.Unmarshal([]byte(b), &rule)
 	require.NoError(t, err)
-	assert.Equal(t, "example.com", rule.Domain)
+	assert.Equal(t, randomDomainName, rule.Domain)
+	assert.Equal(t, "test content", rule.Content)
 	assert.False(t, rule.Enabled)
 
 	// same disabled rule still should appear in All call
@@ -279,9 +290,21 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	assert.Contains(t, rules, rule)
 
 	// get the disabled rule by domain, should not be found
-	b, code = get(t, ts.URL+"/api/rule?url=https://example.com")
+	b, code = get(t, ts.URL+"/api/rule?url=https://"+randomDomainName)
 	assert.Equal(t, http.StatusBadRequest, code)
 	assert.Equal(t, "{\"error\":\"not found\"}\n", b)
+
+	// save the rule with new content, ID should remain the same
+	r, err = post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "new content"}`, randomDomainName))
+	require.NoError(t, err)
+	rule = datastore.Rule{}
+	err = json.NewDecoder(r.Body).Decode(&rule)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, r.StatusCode)
+	assert.NoError(t, r.Body.Close())
+	assert.Equal(t, randomDomainName, rule.Domain)
+	assert.Equal(t, "new content", rule.Content)
+	assert.Equal(t, ruleID, rule.ID.Hex())
 }
 
 func TestServer_RuleUnhappyFlow(t *testing.T) {
@@ -360,7 +383,6 @@ func del(t *testing.T, url string) (*http.Response, error) {
 }
 
 // startupT runs fully configured testing server
-// srvHook is an optional func to set some Rest param after the creation but prior to Run
 func startupT(t *testing.T) (*httptest.Server, *Server) {
 	if _, ok := os.LookupEnv("ENABLE_MONGO_TESTS"); !ok {
 		t.Skip("ENABLE_MONGO_TESTS env variable is not set")
@@ -375,4 +397,13 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 	}
 
 	return httptest.NewServer(srv.routes(".")), &srv
+}
+
+// thanks to https://stackoverflow.com/a/31832326/961092
+func randStringBytesRmndr(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Int64()%int64(len(letterBytes))]
+	}
+	return string(b)
 }
