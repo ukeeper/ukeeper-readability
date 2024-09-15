@@ -3,6 +3,7 @@ package rest
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"time"
@@ -251,11 +252,17 @@ func basicAuth(realm string, credentials map[string]string) func(http.Handler) h
 			}
 
 			validPassword, userFound := credentials[username]
+			validPasswordBytes := []byte(validPassword)
 			if !userFound {
 				unauthorized(w, realm)
 				return
 			}
-			if password != validPassword {
+			// take the same amount of time if the lengths are different
+			// this is required since ConstantTimeCompare returns immediately when slices of different length are compared
+			if len(password) != len(validPassword) {
+				subtle.ConstantTimeCompare(validPasswordBytes, validPasswordBytes)
+			}
+			if subtle.ConstantTimeCompare([]byte(password), validPasswordBytes) == 0 {
 				unauthorized(w, realm)
 				return
 			}
