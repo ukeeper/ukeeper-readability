@@ -22,7 +22,7 @@ type MongoServer struct {
 func New(connectionURI, dbName string, delay time.Duration) (*MongoServer, error) {
 	log.Printf("[INFO] connect to mongo server with db=%s, delay=%s", dbName, delay)
 	if delay > 0 {
-		log.Printf("[DEBUG] initial mongo delay=%d", delay)
+		log.Printf("[DEBUG] initial mongo delay=%s", delay)
 		time.Sleep(delay)
 	}
 	if connectionURI == "" {

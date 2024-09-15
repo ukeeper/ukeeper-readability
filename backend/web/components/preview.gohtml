@@ -1,0 +1,12 @@
+{{if .Results}}
+  <div class="preview">
+      {{range $index, $result := .Results}}
+        <details {{if eq $index 0}}open{{end}}>
+          <summary>{{$result.Title}}</summary>
+            {{template "preview-item" $result}}
+        </details>
+      {{end}}
+  </div>
+{{else}}
+  <p>No preview results available.</p>
+{{end}}

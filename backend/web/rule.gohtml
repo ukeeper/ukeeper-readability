@@ -1,0 +1,12 @@
+{{define "content"}}
+{{template "rule-form" .Rule}}
+
+<script>
+    document.body.addEventListener('htmx:beforeSwap', function (evt) {
+        if (evt.detail.xhr.status === 200 && evt.detail.xhr.getResponseHeader('HX-Redirect')) {
+            window.location.href = evt.detail.xhr.getResponseHeader('HX-Redirect');
+            evt.preventDefault();
+        }
+    });
+</script>
+{{end}}
