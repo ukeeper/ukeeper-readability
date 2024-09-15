@@ -1,0 +1,59 @@
+{{define "rule-form"}}
+  <div id="rule" class="rule form page__rule">
+    <form hx-post="/api/rule" hx-swap="none">
+        {{if .ID.Hex}}
+          <input type="hidden" name="id" value="{{.ID.Hex}}">
+        {{end}}
+      <div class="row rule__row">
+        <div class="row__col rule__col">
+          <div class="form__tip">Домен:</div>
+          <input type="text" name="domain" class="form__input rule__domain" value="{{.Domain}}" required>
+        </div>
+        <div class="row__col rule__col">
+          <div class="form__tip">Автор:</div>
+          <input type="text" name="author" class="form__input rule__author" value="{{.Author}}">
+        </div>
+      </div>
+      <div class="row rule__row">
+        <div class="row__col rule__col">
+          <div class="form__tip">Контент:</div>
+          <textarea name="content" class="form__input form__input_big rule__content" required>{{.Content}}</textarea>
+        </div>
+        <div class="row__col rule__col">
+          <div class="form__tip">Совпадения по фрагменту URL (по одному в строке):</div>
+          <textarea name="match_url" class="form__input form__input_big rule__match-urls">{{range .MatchURLs}}{{.}}
+              {{end}}</textarea>
+        </div>
+      </div>
+      <div class="row rule__row">
+        <div class="row__col rule__col">
+          <div class="form__tip">Исключения (по одному в строке):</div>
+          <textarea name="excludes" class="form__input form__input_big rule__excludes">{{range .Excludes}}{{.}}
+              {{end}}</textarea>
+        </div>
+        <div class="row__col rule__col">
+          <div class="form__tip">Тестовые URL:</div>
+          <textarea name="test_urls" class="form__input form__input_big rule__test-urls">
+{{- range $index, $element := .TestURLs -}}{{- if $index }}
+{{ end -}}{{- $element -}}{{- end -}}</textarea>
+          <div class="form__button-tip form__button-tip_error rule__tip-error"></div>
+        </div>
+      </div>
+      <div class="row rule__row">
+        <div class="row__col rule__col">
+          <button type="submit" class="form__button rule__button-save">Сохранить</button>
+        </div>
+        <div class="row__col rule__col">
+          <button type="button"
+                  class="form__button rule__button-preview"
+                  hx-post="/api/preview"
+                  hx-swap="innerHTML"
+                  hx-target="#previewArea">
+            Показать превью
+          </button>
+        </div>
+      </div>
+    </form>
+    <div id="previewArea"></div>
+  </div>
+{{end}}

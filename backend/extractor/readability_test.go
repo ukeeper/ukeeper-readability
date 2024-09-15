@@ -171,7 +171,7 @@ func TestGetContentCustom(t *testing.T) {
 	assert.NoError(t, err)
 	body := string(dataBytes)
 
-	content, rich, err := lr.getContent(context.Background(), body, ts.URL+"/2015/09/25/poiezdka-s-apple-maps/")
+	content, rich, err := lr.getContent(context.Background(), body, ts.URL+"/2015/09/25/poiezdka-s-apple-maps/", nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 6988, len(content))
 	assert.Equal(t, 7169, len(rich))

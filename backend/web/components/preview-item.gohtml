@@ -1,0 +1,12 @@
+{{define "preview-item"}}
+  <div class="preview-item">
+    <div class="preview__tip">Анонс:</div>
+    <p class="preview__data">{{.Excerpt}}</p>
+
+    <div class="preview__tip">Полный контент с тегами:</div>
+    <div class="preview__data">{{.Rich }}</div>
+
+    <div class="preview__tip">Текстовый контент:</div>
+    <p class="preview__data">{{.Content}}</p>
+  </div>
+{{end}}

@@ -59,9 +59,19 @@ var (
 const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15"
 
 // Extract fetches page and retrieves article
-func (f UReadability) Extract(ctx context.Context, reqURL string) (rb *Response, err error) {
+func (f UReadability) Extract(ctx context.Context, reqURL string) (*Response, error) {
+	return f.extractWithRules(ctx, reqURL, nil)
+}
+
+// ExtractByRule fetches page and retrieves article using a specific rule
+func (f UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
+	return f.extractWithRules(ctx, reqURL, rule)
+}
+
+// ExtractWithRules is the core function that handles extraction with or without a specific rule
+func (f UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	log.Printf("[INFO] extract %s", reqURL)
-	rb = &Response{}
+	rb := &Response{}
 
 	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
@@ -93,7 +103,7 @@ func (f UReadability) Extract(ctx context.Context, reqURL string) (rb *Response,
 
 	var body string
 	rb.ContentType, rb.Charset, body = f.toUtf8(dataBytes, resp.Header)
-	rb.Content, rb.Rich, err = f.getContent(ctx, body, reqURL)
+	rb.Content, rb.Rich, err = f.getContent(ctx, body, reqURL, rule)
 	if err != nil {
 		log.Printf("[WARN] failed to parse %s, error=%v", reqURL, err)
 		return nil, err
@@ -127,8 +137,10 @@ func (f UReadability) Extract(ctx context.Context, reqURL string) (rb *Response,
 	return rb, nil
 }
 
-// gets content from raw body string, both content (text only) and rich (with html tags)
-func (f UReadability) getContent(ctx context.Context, body, reqURL string) (content, rich string, err error) {
+// getContent retrieves content from raw body string, both content (text only) and rich (with html tags)
+// if rule is provided, it uses custom rule, otherwise tries to retrieve one from the storage,
+// and at last tries to use general readability parser
+func (f UReadability) getContent(ctx context.Context, body, reqURL string, rule *datastore.Rule) (content, rich string, err error) {
 	// general parser
 	genParser := func(body, _ string) (content, rich string, err error) {
 		doc, err := readability.NewDocument(body)
@@ -157,6 +169,11 @@ func (f UReadability) getContent(ctx context.Context, body, reqURL string) (cont
 		}
 		log.Printf("[INFO] custom rule processed for %s", reqURL)
 		return f.getText(res, ""), res, nil
+	}
+
+	if rule != nil {
+		log.Printf("[DEBUG] custom rule provided for %s: %v", reqURL, rule)
+		return customParser(body, reqURL, *rule)
 	}
 
 	if f.Rules != nil {

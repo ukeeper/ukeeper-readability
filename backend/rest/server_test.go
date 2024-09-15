@@ -240,7 +240,7 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
 	// save a rule
-	r, err := post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "test content"}`, randomDomainName))
+	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
 	rule := datastore.Rule{}
 	err = json.NewDecoder(r.Body).Decode(&rule)
@@ -252,28 +252,16 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	ruleID := rule.ID.Hex()
 
 	// get the rule we just saved
-	b, code := get(t, ts.URL+"/api/rule?url=https://"+randomDomainName)
+	b, code := get(t, ts.URL+"/edit/"+ruleID)
 	assert.Equal(t, http.StatusOK, code)
-	rule = datastore.Rule{}
-	err = json.Unmarshal([]byte(b), &rule)
-	require.NoError(t, err)
-	assert.Equal(t, randomDomainName, rule.Domain)
-	assert.Equal(t, "test content", rule.Content)
-	assert.True(t, rule.Enabled)
-	assert.Equal(t, ruleID, rule.ID.Hex())
+	assert.Contains(t, b, rule.Domain)
+	assert.Contains(t, b, rule.Content)
 
 	// check the rule presence in "all" list
-	b, code = get(t, ts.URL+"/api/rules")
+	b, code = get(t, ts.URL)
 	assert.Equal(t, http.StatusOK, code)
-	var rules []datastore.Rule
-	err = json.Unmarshal([]byte(b), &rules)
-	require.NoError(t, err)
-	assert.Contains(t, rules, rule)
-
-	// get the rule by ID (available after Get call)
-	b, code = get(t, ts.URL+"/api/rule/"+fmt.Sprintf(`%s`, ruleID))
-	assert.Equal(t, http.StatusOK, code)
-	assert.NotEmpty(t, b)
+	assert.Contains(t, b, rule.Domain)
+	assert.Contains(t, b, rule.Content)
 
 	// disable the rule
 	r, err = post(t, ts.URL+"/api/toggle-rule/"+rule.ID.Hex(), "")
@@ -284,31 +272,20 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	assert.Equal(t, http.StatusOK, r.StatusCode, string(body))
 	assert.NoError(t, r.Body.Close())
 
-	// get the rule by ID, should be marked as disabled
-	b, code = get(t, ts.URL+"/api/rule/"+fmt.Sprintf(`%s`, ruleID))
+	// get the rule by ID, should look the same as "Enabled" status is only visible on the main page
+	b, code = get(t, ts.URL+"/edit/"+ruleID)
 	assert.Equal(t, http.StatusOK, code)
-	rule = datastore.Rule{}
-	err = json.Unmarshal([]byte(b), &rule)
-	require.NoError(t, err)
-	assert.Equal(t, randomDomainName, rule.Domain)
-	assert.Equal(t, "test content", rule.Content)
-	assert.False(t, rule.Enabled)
+	assert.Contains(t, b, rule.Domain)
+	assert.Contains(t, b, rule.Content)
 
-	// same disabled rule still should appear in All call
-	b, code = get(t, ts.URL+"/api/rules")
+	// same disabled rule still should appear in the call to the main page
+	b, code = get(t, ts.URL)
 	assert.Equal(t, http.StatusOK, code)
-	rules = []datastore.Rule{}
-	err = json.Unmarshal([]byte(b), &rules)
-	require.NoError(t, err)
-	assert.Contains(t, rules, rule)
-
-	// get the disabled rule by domain, should not be found
-	b, code = get(t, ts.URL+"/api/rule?url=https://"+randomDomainName)
-	assert.Equal(t, http.StatusBadRequest, code)
-	assert.Equal(t, "{\"error\":\"not found\"}\n", b)
+	assert.Contains(t, b, rule.Domain)
+	assert.Contains(t, b, rule.Content)
 
 	// save the rule with new content, ID should remain the same
-	r, err = post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "new content"}`, randomDomainName))
+	r, err = postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=new+content`, randomDomainName))
 	require.NoError(t, err)
 	rule = datastore.Rule{}
 	err = json.NewDecoder(r.Body).Decode(&rule)
@@ -324,33 +301,28 @@ func TestServer_RuleUnhappyFlow(t *testing.T) {
 	ts, _ := startupT(t)
 	defer ts.Close()
 
-	// save with wrong body
-	r, err := post(t, ts.URL+"/api/rule", `""`)
+	// save without domain
+	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", "")
 	require.NoError(t, err)
 	body, err := io.ReadAll(r.Body)
 	assert.NoError(t, err)
 	assert.NoError(t, r.Body.Close())
-	require.Equal(t, http.StatusInternalServerError, r.StatusCode)
-	assert.Equal(t,
-		"{\"error\":\"json: cannot unmarshal string into Go value of type datastore.Rule\"}\n",
-		string(body))
+	require.Equal(t, http.StatusBadRequest, r.StatusCode)
+	assert.Equal(t, "Domain is required\n", string(body))
 
-	// get with no URL parameter set
-	b, code := get(t, ts.URL+"/api/rule")
-	assert.Equal(t, http.StatusExpectationFailed, code)
-	assert.Equal(t, "{\"error\":\"no url passed\"}\n", b)
+	// get supposed to fail
+	_, code := get(t, ts.URL+"/api/rule")
+	assert.Equal(t, http.StatusMethodNotAllowed, code)
 
 	// get rule by non-existent ID
-	b, code = get(t, ts.URL+"/api/rule/nonexistent")
-	assert.Equal(t, http.StatusBadRequest, code)
-	assert.Equal(t, "{\"error\":\"not found\"}\n", b)
+	_, code = get(t, ts.URL+"/api/rule/nonexistent")
+	assert.Equal(t, http.StatusNotFound, code)
 }
 
 func TestServer_FakeAuth(t *testing.T) {
 	ts, _ := startupT(t)
 	defer ts.Close()
 
-	// save with wrong body
 	r, err := post(t, ts.URL+"/api/auth", `""`)
 	require.NoError(t, err)
 	body, err := io.ReadAll(r.Body)
@@ -358,16 +330,6 @@ func TestServer_FakeAuth(t *testing.T) {
 	assert.NoError(t, r.Body.Close())
 	assert.Equal(t, http.StatusOK, r.StatusCode)
 	assert.Contains(t, string(body), `"pong":`)
-
-	// get with no URL parameter set
-	b, code := get(t, ts.URL+"/api/rule")
-	assert.Equal(t, http.StatusExpectationFailed, code)
-	assert.Equal(t, "{\"error\":\"no url passed\"}\n", b)
-
-	// get rule by non-existent ID
-	b, code = get(t, ts.URL+"/api/rule/nonexistent")
-	assert.Equal(t, http.StatusBadRequest, code)
-	assert.Equal(t, "{\"error\":\"not found\"}\n", b)
 }
 
 func TestServer_HandleIndex(t *testing.T) {
@@ -376,7 +338,7 @@ func TestServer_HandleIndex(t *testing.T) {
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
 	// Add a test rule
-	_, err := post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "test content"}`, randomDomainName))
+	_, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
 
 	// Test index page
@@ -393,13 +355,68 @@ func TestServer_HandleIndex(t *testing.T) {
 	assert.Contains(t, string(body), "Правила")
 }
 
+func TestServer_HandleAdd(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+
+	// Test add page
+	resp, err := http.Get(ts.URL + "/add/")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(body), "Добавление правила")
+	assert.Contains(t, string(body), `<form hx-post="/api/rule" hx-swap="none">`)
+}
+
+func TestServer_HandleEdit(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+
+	randomDomainName := randStringBytesRmndr(42) + ".com"
+
+	// Add a test rule
+	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
+	require.NoError(t, err)
+	var rule datastore.Rule
+	err = json.NewDecoder(r.Body).Decode(&rule)
+	require.NoError(t, err)
+
+	// Test edit page
+	resp, err := http.Get(ts.URL + "/edit/" + rule.ID.Hex())
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, string(body), "Редактирование правила")
+	assert.Contains(t, string(body), randomDomainName)
+	assert.Contains(t, string(body), "test content")
+
+	// Test edit page for non-existing rule
+	resp, err = http.Get(ts.URL + "/edit/non-existing")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	assert.Contains(t, string(body), "Rule not found")
+}
+
 func TestServer_ToggleRule(t *testing.T) {
 	ts, _ := startupT(t)
 	defer ts.Close()
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
 	// Add a test rule
-	r, err := post(t, ts.URL+"/api/rule", fmt.Sprintf(`{"domain": "%s", "content": "test content"}`, randomDomainName))
+	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
 	var rule datastore.Rule
 	err = json.NewDecoder(r.Body).Decode(&rule)
@@ -445,6 +462,122 @@ func TestServer_ToggleRuleNotFound(t *testing.T) {
 	assert.Contains(t, string(body), `Rule not found`, string(body))
 }
 
+func TestServer_SaveRule(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+
+	randomDomainName := randStringBytesRmndr(42) + ".com"
+
+	// Test saving a new rule
+	resp, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content&author=test+author`, randomDomainName))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "/", resp.Header.Get("HX-Redirect"))
+
+	// Test updating an existing rule
+	var rule datastore.Rule
+	err = json.NewDecoder(resp.Body).Decode(&rule)
+	require.NoError(t, err)
+
+	updatedRule := fmt.Sprintf(`id=%s&domain=%s&content=updated+content&author=updated+author`, rule.ID.Hex(), randomDomainName)
+	resp, err = postFormUrlencoded(t, ts.URL+"/api/rule", updatedRule)
+
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "/", resp.Header.Get("HX-Redirect"))
+
+	// Verify the rule was updated
+	b, code := get(t, ts.URL)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Contains(t, b, "updated content")
+
+	b, code = get(t, ts.URL+"/edit/"+rule.ID.Hex())
+	assert.Equal(t, http.StatusOK, code)
+	assert.Contains(t, b, rule.Domain)
+	assert.NotContains(t, b, rule.Content)
+	assert.Contains(t, b, "updated content")
+	assert.Contains(t, b, "updated author")
+
+	// try to save a rule with the new domain, supposed to fail as ID should be different and can't be altered
+	updatedRule = fmt.Sprintf(`id=%s&domain=another_domain&content=updated+content&author=updated+author`, rule.ID.Hex())
+	resp, err = postFormUrlencoded(t, ts.URL+"/api/rule", updatedRule)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "duplicate")
+
+	// 10Mb body supposed to hit the form parsing limit
+	resp, err = postFormUrlencoded(t, ts.URL+"/api/rule", "domain="+strings.Repeat("a", 10*1024*1024))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	body, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "Failed to parse form")
+}
+
+func TestServer_Preview(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+
+	tss := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
+			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			testHTML, err := io.ReadAll(fh)
+			require.NoError(t, err)
+			require.NoError(t, fh.Close())
+			_, err = w.Write(testHTML)
+			require.NoError(t, err)
+			return
+		}
+	}))
+	defer tss.Close()
+
+	// happy path with no rule
+	resp, err := postFormUrlencoded(t, ts.URL+"/api/preview",
+		fmt.Sprintf(`test_urls=%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/&content=`, tss.URL))
+	assert.NoError(t, err)
+	b, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
+	assert.NoError(t, resp.Body.Close())
+	assert.Contains(t, string(b), "<summary>Всем миром для общей пользы • Umputun тут был</summary>")
+
+	// happy path with custom rule
+	resp, err = postFormUrlencoded(t, ts.URL+"/api/preview",
+		fmt.Sprintf(`test_urls=%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/&content=article`, tss.URL))
+	assert.NoError(t, err)
+	b, err = io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
+	assert.NoError(t, resp.Body.Close())
+	assert.Contains(t, string(b), "Всем миром для общей пользы")
+
+	// no URL
+	resp, err = post(t, ts.URL+"/api/preview", "")
+	assert.NoError(t, err)
+	b, err = io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
+	assert.NoError(t, resp.Body.Close())
+	assert.Contains(t, string(b), "No preview results available.")
+
+	// 10Mb body supposed to hit the form parsing limit
+	resp, err = postFormUrlencoded(t, ts.URL+"/api/preview", "domain="+strings.Repeat("a", 10*1024*1024))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	b, err = io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), "Failed to parse form")
+}
+
 func get(t *testing.T, url string) (response string, statusCode int) {
 	r, err := http.Get(url)
 	assert.NoError(t, err)
@@ -462,10 +595,11 @@ func post(t *testing.T, url, body string) (*http.Response, error) {
 	return client.Do(req)
 }
 
-func del(t *testing.T, url string) (*http.Response, error) {
+func postFormUrlencoded(t *testing.T, url, body string) (*http.Response, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest("POST", url, strings.NewReader(body))
 	assert.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth("admin", "password")
 	return client.Do(req)
 }
@@ -487,6 +621,7 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 	webDir := "../web"
 	templates := template.Must(template.ParseGlob(filepath.Join(webDir, "components", "*.gohtml")))
 	srv.indexPage = template.Must(template.Must(templates.Clone()).ParseFiles(filepath.Join(webDir, "index.gohtml")))
+	srv.rulePage = template.Must(template.Must(templates.Clone()).ParseFiles(filepath.Join(webDir, "rule.gohtml")))
 
 	return httptest.NewServer(srv.routes(webDir)), &srv
 }

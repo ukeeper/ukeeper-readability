@@ -1,7 +1,7 @@
 {{define "rule-row"}}
   <tr class="rules__row {{if not .Enabled}}rules__row_disabled{{end}}" data-id="{{.ID.Hex}}">
     <td class="rules__domain-cell">
-      <a href="/edit?id={{.ID.Hex}}" class="link">{{if .Domain}}{{.Domain}}{{else}}unspecified{{end}}</a>
+      <a href="/edit/{{.ID.Hex}}" class="link">{{if .Domain}}{{.Domain}}{{else}}unspecified{{end}}</a>
     </td>
     <td class="rules__content-cell">{{.Content}}</td>
     <td class="rules__enabled-cell">
