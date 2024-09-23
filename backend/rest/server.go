@@ -181,7 +181,7 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, &res)
 }
 
-// emulate readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
+// extractArticleEmulateReadability emulates readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
