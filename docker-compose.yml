@@ -1,4 +1,3 @@
-version: '2'
 services:
   ureadability:
     build: .
@@ -18,7 +17,8 @@ services:
     environment:
       - MONGO_URI=mongodb://root:Squid3kIc6Dew4ad8Ci5@mongo:27017
       - MONGO_DELAY=10s
-      - CREDS=test:l4!AzQVW1dSN0T^7IJGn&Kr!kwRSF2P1
+      - CREDS=admin:jpm6AQH!kbx2tvk!fqc
+      #- OPENAI_KEY=insert_key_here
 
     ports:
       - "8080:8080"
@@ -34,16 +34,25 @@ services:
     restart: always
     container_name: ureadability-mongo
 
-    # uncomment to make mongo available for tests
-    #ports:
-    #  - "27017:27017"
-
     environment:
       - MONGO_INITDB_DATABASE=admin
-      # comment the next two lines to have mongodb ready for tests,
-      # then start them by running
-      # `ENABLE_MONGO_TESTS=true go test ./...`
       - MONGO_INITDB_ROOT_USERNAME=root
       - MONGO_INITDB_ROOT_PASSWORD=Squid3kIc6Dew4ad8Ci5
     volumes:
       - /tmp/mongodb:/data/db
+
+# uncomment the lines below to have mongodb ready for tests,
+# then start them by running
+# `ENABLE_MONGO_TESTS=true go test ./...`
+#  mongo-tests:
+#    image: mongo:5.0
+#    logging:
+#      driver: json-file
+#      options:
+#        max-size: "20m"
+#        max-file: "5"
+#    hostname: mongo-tests
+#    restart: always
+#    container_name: ureadability-mongo-tests
+#    ports:
+#      - "27017:27017"
