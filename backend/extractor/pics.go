@@ -11,7 +11,7 @@ import (
 	log "github.com/go-pkgz/lgr"
 )
 
-func (f UReadability) extractPics(iselect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
+func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
 	images := make(map[int]string)
 
 	type imgInfo struct {
@@ -58,7 +58,7 @@ func (f UReadability) extractPics(iselect *goquery.Selection, url string) (mainI
 }
 
 // getImageSize loads image to get size
-func (f UReadability) getImageSize(url string) (size int) {
+func (f *UReadability) getImageSize(url string) (size int) {
 	httpClient := &http.Client{Timeout: time.Second * 30}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
