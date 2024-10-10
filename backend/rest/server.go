@@ -82,6 +82,7 @@ func (s *Server) routes(frontendDir string) chi.Router {
 		r.Get("/content/v1/parser", s.extractArticleEmulateReadability)
 		r.Post("/extract", s.extractArticle)
 		r.Post("/auth", s.authFake)
+		r.Get("/content-parsed-wrong", s.contentParsedWrong)
 
 		r.Group(func(protected chi.Router) {
 			protected.Use(basicAuth("ureadability", s.Credentials))
@@ -389,6 +390,30 @@ func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) authFake(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
 	render.JSON(w, r, JSON{"pong": t.Format("20060102150405")})
+}
+
+func (s *Server) contentParsedWrong(w http.ResponseWriter, r *http.Request) {
+	if s.Readability.OpenAIKey == "" {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": "OpenAI key is not set"})
+		return
+	}
+
+	exampleURL := r.URL.Query().Get("url")
+	if exampleURL == "" {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, JSON{"error": "url parameter is required"})
+		return
+	}
+
+	message, err := s.Readability.ContentParsedWrong(r.Context(), exampleURL)
+	if err != nil {
+		render.Status(r, http.StatusInternalServerError)
+		render.JSON(w, r, JSON{"error": err.Error()})
+		return
+	}
+
+	render.JSON(w, r, JSON{"message": message})
 }
 
 func getBid(id string) primitive.ObjectID {
