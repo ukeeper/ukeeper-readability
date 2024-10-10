@@ -26,6 +26,7 @@ var opts struct {
 	MongoURI    string            `short:"m" long:"mongo_uri" env:"MONGO_URI" required:"true" description:"MongoDB connection string"`
 	MongoDelay  time.Duration     `long:"mongo-delay" env:"MONGO_DELAY" default:"0" description:"mongo initial delay"`
 	MongoDB     string            `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
+	OpenAIKey   string            `long:"openai_key" env:"OPENAI_KEY" description:"OpenAI API key for summary generation"`
 	Debug       bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
 }
 
@@ -41,7 +42,7 @@ func main() {
 		log.Fatalf("[ERROR] can't connect to mongo %v", err)
 	}
 	srv := rest.Server{
-		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: db.GetStores()},
+		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: db.GetStores(), OpenAIKey: opts.OpenAIKey},
 		Token:       opts.Token,
 		Credentials: opts.Credentials,
 		Version:     revision,
