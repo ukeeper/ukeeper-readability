@@ -37,15 +37,29 @@ func New(connectionURI, dbName string, delay time.Duration) (*MongoServer, error
 	return &MongoServer{client: client, dbName: dbName}, nil
 }
 
+// Stores contains all DAO instances
+type Stores struct {
+	Rules     RulesDAO
+	Summaries SummariesDAO
+}
+
 // GetStores initialize collections and make indexes
-func (m *MongoServer) GetStores() (rules RulesDAO) {
+func (m *MongoServer) GetStores() Stores {
 	rIndexes := []mongo.IndexModel{
 		{Keys: bson.D{{Key: "enabled", Value: 1}, {Key: "domain", Value: 1}}},
 		{Keys: bson.D{{Key: "user", Value: 1}, {Key: "domain", Value: 1}, {Key: "enabled", Value: 1}}},
 		{Keys: bson.D{{Key: "domain", Value: 1}, {Key: "match_urls", Value: 1}}},
 	}
-	rules = RulesDAO{Collection: m.collection("rules", rIndexes)}
-	return rules
+
+	sIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "created_at", Value: 1}}},
+		{Keys: bson.D{{Key: "model", Value: 1}}},
+	}
+
+	return Stores{
+		Rules:     RulesDAO{Collection: m.collection("rules", rIndexes)},
+		Summaries: SummariesDAO{Collection: m.collection("summaries", sIndexes)},
+	}
 }
 
 // collection makes collection with indexes

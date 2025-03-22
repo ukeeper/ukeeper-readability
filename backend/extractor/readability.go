@@ -14,10 +14,16 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
+	"github.com/sashabaranov/go-openai"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 )
+
+//go:generate moq -out openai_mock.go . OpenAIClient
+type OpenAIClient interface {
+	CreateChatCompletion(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
+}
 
 // Rules interface with all methods to access datastore
 type Rules interface {
@@ -28,15 +34,35 @@ type Rules interface {
 	All(ctx context.Context) []datastore.Rule
 }
 
+// Summaries interface with all methods to access summary cache
+//
+//go:generate moq -out summaries_mock.go . Summaries
+type Summaries interface {
+	Get(ctx context.Context, content string) (datastore.Summary, bool)
+	Save(ctx context.Context, summary datastore.Summary) error
+	Delete(ctx context.Context, contentHash string) error
+}
+
 // UReadability implements fetcher & extractor for local readability-like functionality
 type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Rules       Rules
+	Summaries   Summaries
+	OpenAIKey   string
+	ModelType   string
+
+	apiClient OpenAIClient
+}
+
+// SetAPIClient sets the API client for testing purposes
+func (f *UReadability) SetAPIClient(client OpenAIClient) {
+	f.apiClient = client
 }
 
 // Response from api calls
 type Response struct {
+	Summary     string   `json:"summary,omitempty"`
 	Content     string   `json:"content"`
 	Rich        string   `json:"rich_content"`
 	Domain      string   `json:"domain"`
@@ -66,6 +92,74 @@ func (f *UReadability) Extract(ctx context.Context, reqURL string) (*Response, e
 // ExtractByRule fetches page and retrieves article using a specific rule
 func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	return f.extractWithRules(ctx, reqURL, rule)
+}
+
+func (f *UReadability) GenerateSummary(ctx context.Context, content string) (string, error) {
+	// Check for API key
+	if f.OpenAIKey == "" {
+		return "", fmt.Errorf("API key for summarization is not set")
+	}
+
+	// Check for cached summary
+	if f.Summaries != nil {
+		if cachedSummary, found := f.Summaries.Get(ctx, content); found {
+			log.Printf("[DEBUG] using cached summary for content")
+			return cachedSummary.Summary, nil
+		}
+	}
+
+	// Initialize client if needed
+	if f.apiClient == nil {
+		f.apiClient = openai.NewClient(f.OpenAIKey)
+	}
+
+	// Use the model name or default to GPT-4o Mini if not specified
+	model := openai.GPT4oMini
+	if f.ModelType != "" {
+		model = f.ModelType
+	}
+	// Generate summary
+	resp, err := f.apiClient.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: model,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "You are a helpful assistant that summarizes articles. Please summarize the main points in a few sentences as TLDR style (don't add a TLDR label). Then, list up to five detailed bullet points. Provide the response in plain text. Do not add any additional information. Do not add a Summary at the beginning of the response. If detailed bullet points are too similar to the summary, don't include them at all:",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: content,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		log.Printf("[WARN] AI summarization failed: %v", err)
+		return "", fmt.Errorf("failed to generate summary: %w", err)
+	}
+
+	summary := resp.Choices[0].Message.Content
+
+	// Cache the summary if summaries cache is available
+	if f.Summaries != nil {
+		err = f.Summaries.Save(ctx, datastore.Summary{
+			Content:   content,
+			Summary:   summary,
+			Model:     model,
+			CreatedAt: time.Now(),
+		})
+
+		if err != nil {
+			log.Printf("[WARN] failed to cache summary: %v", err)
+		} else {
+			log.Printf("[DEBUG] summary cached successfully")
+		}
+	}
+
+	return summary, nil
 }
 
 // ExtractWithRules is the core function that handles extraction with or without a specific rule
