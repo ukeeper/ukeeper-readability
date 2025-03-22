@@ -194,7 +194,7 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Check if summary is requested but token is not provided, or OpenAI key is not set
+	// Check if summary is requested but token is not provided, or API key is not set
 	if summary {
 		if s.Readability.OpenAIKey == "" {
 			render.Status(r, http.StatusBadRequest)
@@ -277,10 +277,13 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// Generate summary if API key is available
 		if s.Readability.OpenAIKey != "" {
 			result.Summary, e = s.Readability.GenerateSummary(r.Context(), result.Content)
 			if e != nil {
 				log.Printf("[WARN] failed to generate summary for preview of %s: %v", url, e)
+			} else {
+				log.Printf("[DEBUG] summary generated successfully for preview of %s", url)
 			}
 		}
 
