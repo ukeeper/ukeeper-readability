@@ -59,7 +59,7 @@ func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (main
 
 // getImageSize loads image to get size
 func (f *UReadability) getImageSize(url string) (size int) {
-	httpClient := &http.Client{Timeout: time.Second * 30}
+	httpClient := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Printf("[WARN] can't create request to get pic from %s", url)

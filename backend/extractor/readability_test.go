@@ -40,29 +40,60 @@ func TestExtractURL(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	lr := UReadability{TimeOut: 30, SnippetSize: 200}
-	t.Log("full url")
-	rb, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
-	assert.NoError(t, err)
-	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "not changed")
-	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", rb.Title)
-	assert.Equal(t, 9665, len(rb.Content))
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 
-	t.Log("short url")
-	rb, err = lr.Extract(context.Background(), ts.URL+"/IAvTHr")
-	assert.NoError(t, err)
-	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", rb.URL, "full url")
-	assert.Equal(t, 9665, len(rb.Content))
+	tests := []struct {
+		name           string
+		url            string
+		wantURL        string
+		wantTitle      string
+		wantContentLen int
+		wantErr        bool
+	}{
+		{
+			name:           "full url",
+			url:            ts.URL + "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/",
+			wantURL:        ts.URL + "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/",
+			wantTitle:      "Всем миром для общей пользы • Umputun тут был",
+			wantContentLen: 9665,
+			wantErr:        false,
+		},
+		{
+			name:           "short url",
+			url:            ts.URL + "/IAvTHr",
+			wantURL:        ts.URL + "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/",
+			wantTitle:      "Всем миром для общей пользы • Umputun тут был",
+			wantContentLen: 9665,
+			wantErr:        false,
+		},
+		{
+			name:    "bad body",
+			url:     ts.URL + "/bad_body",
+			wantErr: true,
+		},
+		{
+			name:    "bad url",
+			url:     "http://bad_url",
+			wantErr: true,
+		},
+	}
 
-	t.Log("bad body")
-	rb, err = lr.Extract(context.Background(), ts.URL+"/bad_body")
-	//assert.Error(t, err) // TODO: uncomment, wtf?! this should return error!
-	assert.Nil(t, rb)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rb, err := lr.Extract(context.Background(), tt.url)
 
-	t.Log("bad url")
-	rb, err = lr.Extract(context.Background(), "http://bad_url")
-	assert.Error(t, err)
-	assert.Nil(t, rb)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, rb)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantURL, rb.URL)
+			assert.Equal(t, tt.wantTitle, rb.Title)
+			assert.Equal(t, tt.wantContentLen, len(rb.Content))
+		})
+	}
 }
 
 func TestExtractGeneral(t *testing.T) {
@@ -92,7 +123,7 @@ func TestExtractGeneral(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	lr := UReadability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	a, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	assert.NoError(t, err)
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", a.Title)
@@ -114,7 +145,7 @@ func TestExtractGeneral(t *testing.T) {
 }
 
 func TestNormalizeLinks(t *testing.T) {
-	lr := UReadability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	inp := `blah <img src="/aaa.png"/> sdfasd <a href="/blah2/aa.link">something</a> blah33 <img src="//aaa.com/xyz.jpg">xx</img>`
 	u, _ := url.Parse("http://ukeeper.com/blah")
 	out, links := lr.normalizeLinks(inp, &http.Request{URL: u})
@@ -130,7 +161,7 @@ func TestNormalizeLinks(t *testing.T) {
 }
 
 func TestNormalizeLinksIssue(t *testing.T) {
-	lr := UReadability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	_, err := lr.Extract(context.Background(), "https://git-scm.com/book/en/v2/Git-Tools-Submodules")
 	assert.NoError(t, err)
 }
@@ -150,8 +181,8 @@ func (m RulesMock) Disable(_ context.Context, _ primitive.ObjectID) error { retu
 func (m RulesMock) All(_ context.Context) []datastore.Rule                { return make([]datastore.Rule, 0) }
 
 func TestGetContentCustom(t *testing.T) {
-	lr := UReadability{TimeOut: 30, SnippetSize: 200, Rules: RulesMock{}}
-	httpClient := &http.Client{Timeout: time.Second * 30}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200, Rules: RulesMock{}}
+	httpClient := &http.Client{Timeout: 30 * time.Second}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
 			fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")

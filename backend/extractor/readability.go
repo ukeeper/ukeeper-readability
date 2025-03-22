@@ -73,7 +73,7 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	log.Printf("[INFO] extract %s", reqURL)
 	rb := &Response{}
 
-	httpClient := &http.Client{Timeout: time.Second * f.TimeOut}
+	httpClient := &http.Client{Timeout: f.TimeOut}
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		log.Printf("[WARN] failed to create request for %s, error=%v", reqURL, err)
