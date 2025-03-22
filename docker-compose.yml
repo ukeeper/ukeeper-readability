@@ -1,7 +1,7 @@
 services:
   ureadability:
     build: .
-    image: umputun/ukeeper-readability:latest
+    image: ghcr.io/ukeeper/ukeeper-readability:latest
     logging:
       driver: json-file
       options:
@@ -56,3 +56,5 @@ services:
 #    container_name: ureadability-mongo-tests
 #    ports:
 #      - "27017:27017"
+#    environment:
+#      - MONGO_INITDB_DATABASE=admin
