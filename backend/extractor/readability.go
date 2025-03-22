@@ -59,17 +59,17 @@ var (
 const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15"
 
 // Extract fetches page and retrieves article
-func (f UReadability) Extract(ctx context.Context, reqURL string) (*Response, error) {
+func (f *UReadability) Extract(ctx context.Context, reqURL string) (*Response, error) {
 	return f.extractWithRules(ctx, reqURL, nil)
 }
 
 // ExtractByRule fetches page and retrieves article using a specific rule
-func (f UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
+func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	return f.extractWithRules(ctx, reqURL, rule)
 }
 
 // ExtractWithRules is the core function that handles extraction with or without a specific rule
-func (f UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
+func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	log.Printf("[INFO] extract %s", reqURL)
 	rb := &Response{}
 
@@ -140,7 +140,7 @@ func (f UReadability) extractWithRules(ctx context.Context, reqURL string, rule 
 // getContent retrieves content from raw body string, both content (text only) and rich (with html tags)
 // if rule is provided, it uses custom rule, otherwise tries to retrieve one from the storage,
 // and at last tries to use general readability parser
-func (f UReadability) getContent(ctx context.Context, body, reqURL string, rule *datastore.Rule) (content, rich string, err error) {
+func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule *datastore.Rule) (content, rich string, err error) {
 	// general parser
 	genParser := func(body, _ string) (content, rich string, err error) {
 		doc, err := readability.NewDocument(body)
@@ -192,7 +192,7 @@ func (f UReadability) getContent(ctx context.Context, body, reqURL string, rule 
 }
 
 // makes all links absolute and returns all found links
-func (f UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
+func (f *UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
 	absoluteLink := func(link string) (absLink string, changed bool) {
 		if r, err := reqContext.URL.Parse(link); err == nil {
 			return r.String(), r.String() != link
