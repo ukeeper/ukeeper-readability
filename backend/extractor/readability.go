@@ -14,10 +14,16 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
+	"github.com/sashabaranov/go-openai"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
 )
+
+//go:generate moq -out openai_mock.go . OpenAIClient
+type OpenAIClient interface {
+	CreateChatCompletion(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
+}
 
 // Rules interface with all methods to access datastore
 type Rules interface {
@@ -33,10 +39,14 @@ type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Rules       Rules
+	OpenAIKey   string
+
+	openAIClient OpenAIClient
 }
 
 // Response from api calls
 type Response struct {
+	Summary     string   `json:"summary,omitempty"`
 	Content     string   `json:"content"`
 	Rich        string   `json:"rich_content"`
 	Domain      string   `json:"domain"`
@@ -66,6 +76,37 @@ func (f *UReadability) Extract(ctx context.Context, reqURL string) (*Response, e
 // ExtractByRule fetches page and retrieves article using a specific rule
 func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	return f.extractWithRules(ctx, reqURL, rule)
+}
+
+func (f *UReadability) GenerateSummary(ctx context.Context, content string) (string, error) {
+	if f.OpenAIKey == "" {
+		return "", fmt.Errorf("OpenAI key is not set")
+	}
+	if f.openAIClient == nil {
+		f.openAIClient = openai.NewClient(f.OpenAIKey)
+	}
+	resp, err := f.openAIClient.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: openai.GPT4o,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "You are a helpful assistant that summarizes articles. Please summarize the main points in a few sentences as TLDR style (don't add a TLDR label). Then, list up to five detailed bullet points. Provide the response in plain text. Do not add any additional information. Do not add a Summary at the beginning of the response. If detailed bullet points are too similar to the summary, don't include them at all:",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: content,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Choices[0].Message.Content, nil
 }
 
 // ExtractWithRules is the core function that handles extraction with or without a specific rule
@@ -135,6 +176,114 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 
 	log.Printf("[INFO] completed for %s, url=%s", rb.Title, rb.URL)
 	return rb, nil
+}
+
+// ContentParsedWrong handles the logic for when content is parsed incorrectly
+func (f *UReadability) ContentParsedWrong(ctx context.Context, urlStr string) (string, error) {
+	// Extract content using the current method
+	originalContent, err := f.Extract(ctx, urlStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract content: %v", err)
+	}
+
+	// Get CSS selector from ChatGPT
+	selector, err := f.getChatGPTSelector(ctx, urlStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to get CSS selector: %v", err)
+	}
+
+	// Get the HTML body
+	body, err := f.getHTMLBody(urlStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to get HTML body: %v", err)
+	}
+
+	// Extract content using the new selector
+	newContent, err := f.extractContentWithSelector(body, selector)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract content with new selector: %v", err)
+	}
+
+	// Compare original and new content
+	if strings.TrimSpace(originalContent.Content) != strings.TrimSpace(newContent) {
+		// Contents are different, create a new rule
+		rule := datastore.Rule{
+			Author:   "",
+			Domain:   f.extractDomain(urlStr),
+			Content:  selector,
+			TestURLs: []string{urlStr},
+			Enabled:  true,
+		}
+
+		_, err = f.Rules.Save(ctx, rule)
+		if err != nil {
+			return "", fmt.Errorf("failed to save new rule: %v", err)
+		}
+
+		return fmt.Sprintf("new custom rule with DOM %s created", selector), nil
+	}
+
+	return "default rule is good, no need to create the custom one", nil
+}
+
+func (f *UReadability) getChatGPTSelector(ctx context.Context, urlStr string) (string, error) {
+	client := openai.NewClient(f.OpenAIKey)
+	resp, err := client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: openai.GPT4o,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "You are a helpful assistant that provides CSS selectors for extracting main content from web pages.",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: fmt.Sprintf("Given the URL %s, identify the CSS selector that can be used to extract the main content of the article. This typically includes elements like 'article', 'main', or specific classes. Return only this selector and nothing else.", urlStr),
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Choices[0].Message.Content, nil
+}
+
+func (f *UReadability) getHTMLBody(urlStr string) (string, error) {
+	//nolint:gosec
+	resp, err := http.Get(urlStr)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}
+
+func (f *UReadability) extractContentWithSelector(body, selector string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+
+	content := doc.Find(selector).Text()
+	return content, nil
+}
+
+func (f *UReadability) extractDomain(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }
 
 // getContent retrieves content from raw body string, both content (text only) and rich (with html tags)
