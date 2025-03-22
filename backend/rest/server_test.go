@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/go-pkgz/rest"
+	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -588,6 +589,16 @@ func TestServer_ExtractArticleEmulateReadabilityWithSummaryFailures(t *testing.T
 	}))
 	defer ts.Close()
 
+	// create a mock version of the Summaries interface
+	mockSummaries := &extractor.SummariesMock{
+		GetFunc: func(ctx context.Context, content string) (datastore.Summary, bool) {
+			return datastore.Summary{}, false
+		},
+		SaveFunc: func(ctx context.Context, summary datastore.Summary) error {
+			return nil
+		},
+	}
+
 	tests := []struct {
 		name           string
 		serverToken    string
@@ -597,6 +608,7 @@ func TestServer_ExtractArticleEmulateReadabilityWithSummaryFailures(t *testing.T
 		expectedStatus int
 		expectedError  string
 		openAIKey      string
+		openAIModel    string
 	}{
 		{
 			name:           "Valid token and summary, no OpenAI key",
@@ -654,19 +666,55 @@ func TestServer_ExtractArticleEmulateReadabilityWithSummaryFailures(t *testing.T
 			url:            ts.URL,
 			expectedStatus: http.StatusOK,
 		},
+		{
+			name:           "Valid token and summary with custom model",
+			serverToken:    "secret",
+			url:            ts.URL,
+			token:          "secret",
+			summary:        true,
+			expectedStatus: http.StatusOK,
+			openAIKey:      "test key",
+			openAIModel:    "gpt-4o",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := Server{
 				Readability: extractor.UReadability{
-					TimeOut:     30,
-					SnippetSize: 300,
-					Rules:       nil,
-					OpenAIKey:   tt.openAIKey,
+					TimeOut:       30 * time.Second,
+					SnippetSize:   300,
+					Rules:         nil,
+					Summaries:     mockSummaries,
+					OpenAIKey:     tt.openAIKey,
+					OpenAIEnabled: true, // enable OpenAI for tests
+					ModelType:     tt.openAIModel,
 				},
 				Token: tt.serverToken,
 			}
+
+			// set the API client for testing
+			mockClient := &extractor.OpenAIClientMock{
+				CreateChatCompletionFunc: func(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+					model := "gpt-4o-mini"
+					if tt.openAIModel != "" {
+						model = tt.openAIModel
+					}
+					assert.Equal(t, model, request.Model)
+					return openai.ChatCompletionResponse{
+						Choices: []openai.ChatCompletionChoice{
+							{
+								Message: openai.ChatCompletionMessage{
+									Content: "This is a summary of the article.",
+								},
+							},
+						},
+					}, nil
+				},
+			}
+			srv.Readability.SetAPIClient(mockClient)
+
+			//}
 
 			url := fmt.Sprintf("/api/content/v1/parser?url=%s", tt.url)
 			if tt.token != "" {
@@ -689,7 +737,7 @@ func TestServer_ExtractArticleEmulateReadabilityWithSummaryFailures(t *testing.T
 				err = json.Unmarshal(rr.Body.Bytes(), &errorResponse)
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedError, errorResponse["error"])
-			} else if tt.summary {
+			} else if tt.summary && tt.openAIKey != "" {
 				var response extractor.Response
 				err = json.Unmarshal(rr.Body.Bytes(), &response)
 				require.NoError(t, err)
@@ -741,6 +789,8 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 			TimeOut:     30 * time.Second,
 			SnippetSize: 300,
 			Rules:       stores.Rules,
+			Summaries:   stores.Summaries,
+			ModelType:   "mini",
 		},
 		Credentials: map[string]string{"admin": "password"},
 		Version:     "dev-test",
