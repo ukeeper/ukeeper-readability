@@ -36,7 +36,7 @@ func TestServer_FileServer(t *testing.T) {
 	require.NoError(t, err)
 
 	srv := Server{
-		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300},
+		Readability: extractor.UReadability{TimeOut: 30 * time.Second, SnippetSize: 300},
 		Credentials: map[string]string{"admin": "password"},
 	}
 	ts := httptest.NewServer(srv.routes(dir))
@@ -613,7 +613,7 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 	db, err := datastore.New("mongodb://localhost:27017/", "test_ureadability", 0)
 	assert.NoError(t, err)
 	srv := Server{
-		Readability: extractor.UReadability{TimeOut: 30, SnippetSize: 300, Rules: db.GetStores()},
+		Readability: extractor.UReadability{TimeOut: 30 * time.Second, SnippetSize: 300, Rules: db.GetStores()},
 		Credentials: map[string]string{"admin": "password"},
 		Version:     "dev-test",
 	}

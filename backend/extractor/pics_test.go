@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,7 @@ func TestExtractPics(t *testing.T) {
 	defer ts.Close()
 
 	t.Log("test main pic")
-	lr := UReadability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	a, err := lr.Extract(context.Background(), ts.URL+"/2015/09/25/poiezdka-s-apple-maps/")
 	require.NoError(t, err)
 	allImages := []string{
@@ -41,7 +42,7 @@ func TestExtractPics(t *testing.T) {
 
 func TestExtractPicsDirectly(t *testing.T) {
 	t.Log("test pic directly")
-	lr := UReadability{TimeOut: 30, SnippetSize: 200}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	t.Run("normal image retrieval", func(t *testing.T) {
 		data := `<body>
 		<img class="alignright size-full wp-image-944214 lazyloadableImage lazyLoad-fadeIn" alt="View Page Source" width="308" height="508" data-original="https://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg" src="https://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg"></body>`
