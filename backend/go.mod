@@ -9,14 +9,14 @@ require (
 	github.com/didip/tollbooth_chi v0.0.0-20220719025231-d662a7f6928f
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-chi/render v1.0.3
-	github.com/go-pkgz/lgr v0.11.1
-	github.com/go-pkgz/rest v1.20.2
+	github.com/go-pkgz/lgr v0.12.0
+	github.com/go-pkgz/rest v1.20.3
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
 	github.com/stretchr/testify v1.10.0
 	go.mongodb.org/mongo-driver v1.17.3
-	golang.org/x/net v0.36.0
+	golang.org/x/net v0.38.0
 )
 
 require (
@@ -32,9 +32,9 @@ require (
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	golang.org/x/crypto v0.35.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
