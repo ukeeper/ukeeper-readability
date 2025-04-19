@@ -24,9 +24,9 @@ func TestMongoCreation(t *testing.T) {
 
 func TestWrongConnectionString(t *testing.T) {
 	server, err := New("wrong", "test_ureadability", time.Millisecond*100)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, server)
 	server, err = New("", "", time.Millisecond*100)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, server)
 }

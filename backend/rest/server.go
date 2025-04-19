@@ -18,7 +18,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	log "github.com/go-pkgz/lgr"
-	UM "github.com/go-pkgz/rest"
+	um "github.com/go-pkgz/rest"
 	"github.com/go-pkgz/rest/logger"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
@@ -38,7 +38,7 @@ type Server struct {
 }
 
 // JSON is a map alias, just for convenience
-type JSON map[string]interface{}
+type JSON map[string]any
 
 // Run the listen and request's router, activate rest server
 func (s *Server) Run(ctx context.Context, address string, port int, frontendDir string) {
@@ -70,9 +70,9 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 func (s *Server) routes(frontendDir string) chi.Router {
 	router := chi.NewRouter()
 
-	router.Use(middleware.RequestID, middleware.RealIP, UM.Recoverer(log.Default()))
+	router.Use(middleware.RequestID, middleware.RealIP, um.Recoverer(log.Default()))
 	router.Use(middleware.Throttle(1000), middleware.Timeout(60*time.Second))
-	router.Use(UM.AppInfo("ureadability", "Umputun", s.Version), UM.Ping)
+	router.Use(um.AppInfo("ureadability", "Umputun", s.Version), um.Ping)
 	router.Use(tollbooth_chi.LimitHandler(tollbooth.NewLimiter(50, nil)))
 
 	router.Use(logger.New(logger.Log(log.Default()), logger.WithBody, logger.Prefix("[INFO]")).Handler)
@@ -95,9 +95,10 @@ func (s *Server) routes(frontendDir string) chi.Router {
 	router.Get("/edit/{id}", s.handleEdit)
 
 	_ = os.Mkdir(filepath.Join(frontendDir, "static"), 0o700)
-	fs, err := UM.NewFileServer("/", filepath.Join(frontendDir, "static"), UM.FsOptSPA)
+	fs, err := um.NewFileServer("/", filepath.Join(frontendDir, "static"), um.FsOptSPA)
 	if err != nil {
-		log.Fatalf("unable to create file server, %v", err)
+		log.Printf("[ERROR] unable to create file server, %v", err)
+		return nil
 	}
 	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
@@ -118,6 +119,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[WARN] failed to render index template, %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -133,6 +135,7 @@ func (s *Server) handleAdd(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		log.Printf("[WARN] failed to render add template, %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -154,6 +157,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[WARN] failed to render edit template, %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -236,7 +240,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var responses []extractor.Response
+	responses := make([]extractor.Response, 0, len(testURLs))
 	for _, url := range testURLs {
 		url = strings.TrimSpace(url)
 		if url == "" {
@@ -262,12 +266,13 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		Content string
 	}
 
-	var results []result
-	for _, r := range responses {
+	results := make([]result, 0, len(responses))
+	for i := range responses {
+		r := &responses[i]
 		results = append(results, result{
 			Title:   r.Title,
 			Excerpt: r.Excerpt,
-			//nolint: gosec // this content is escaped by Extractor, so it's safe to use it as is
+			//nolint:gosec // this content is escaped by Extractor, so it's safe to use it as is
 			Rich:    template.HTML(r.Rich),
 			Content: r.Content,
 		})
@@ -282,6 +287,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	err = s.rulePage.ExecuteTemplate(w, "preview.gohtml", data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -345,6 +351,7 @@ func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
 	err = s.indexPage.ExecuteTemplate(w, "rule-row", rule)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
@@ -368,7 +375,7 @@ func getBid(id string) primitive.ObjectID {
 // source: https://github.com/99designs/basicauth-go/blob/master/basicauth.go
 func basicAuth(realm string, credentials map[string]string) func(http.Handler) http.Handler {
 	unauthorized := func(w http.ResponseWriter, realm string) {
-		w.Header().Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, realm))
+		w.Header().Add("WWW-Authenticate", fmt.Sprintf("Basic realm=%q", realm))
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 

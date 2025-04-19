@@ -1,3 +1,4 @@
+// Package main is the entry point for the ukeeper-readability service
 package main
 
 import (
@@ -33,7 +34,13 @@ func main() {
 	if _, err := flags.Parse(&opts); err != nil {
 		os.Exit(1)
 	}
-	setupLog(opts.Debug)
+	// Setup logging
+	var options []log.Option
+	if opts.Debug {
+		options = []log.Option{log.Debug, log.CallerFile}
+	}
+	options = append(options, log.Msec, log.LevelBraces)
+	log.Setup(options...)
 
 	log.Printf("[INFO] started ukeeper-readability service %s", revision)
 	db, err := datastore.New(opts.MongoURI, opts.MongoDB, opts.MongoDelay)
@@ -57,12 +64,4 @@ func main() {
 	}()
 
 	srv.Run(ctx, opts.Address, opts.Port, opts.FrontendDir)
-}
-
-func setupLog(dbg bool) {
-	if dbg {
-		log.Setup(log.Debug, log.CallerFile, log.Msec, log.LevelBraces)
-		return
-	}
-	log.Setup(log.Msec, log.LevelBraces)
 }

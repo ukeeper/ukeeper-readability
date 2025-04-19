@@ -11,6 +11,13 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
+const (
+	// DefaultContentType is the default content type for HTML documents
+	DefaultContentType = "text/html"
+	// DefaultEncoding is the default character encoding for HTML documents
+	DefaultEncoding = "utf-8"
+)
+
 // get clean text from html content
 func (f *UReadability) getText(content, title string) string {
 	cleanText := sanitize.HTML(content)
@@ -63,8 +70,8 @@ func (f *UReadability) toUtf8(content []byte, header http.Header) (contentType, 
 	body := string(content)
 
 	result = body
-	contentType = "text/html"
-	origEncoding = "utf-8"
+	contentType = DefaultContentType
+	origEncoding = DefaultEncoding
 
 	if h := header.Get("Content-Type"); h != "" {
 		contentType, origEncoding = getContentTypeAndEncoding(h)

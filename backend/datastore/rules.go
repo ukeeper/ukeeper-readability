@@ -42,7 +42,7 @@ func (r RulesDAO) Get(ctx context.Context, rURL string) (Rule, bool) {
 	var rules []Rule
 	q := bson.M{"domain": u.Host, "enabled": true}
 	log.Printf("[DEBUG] query %v", q)
-	cursor, err := r.Collection.Find(ctx, q)
+	cursor, err := r.Find(ctx, q)
 	if err != nil {
 		log.Printf("[DEBUG] error looking for rules for %s", rURL)
 		return Rule{}, false
@@ -65,13 +65,15 @@ func (r RulesDAO) GetByID(ctx context.Context, id primitive.ObjectID) (Rule, boo
 
 // Save upsert rule
 func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
-	ch, err := r.Collection.UpdateOne(ctx, bson.M{"domain": rule.Domain}, bson.M{"$set": rule}, options.Update().SetUpsert(true))
+	ch, err := r.UpdateOne(ctx, bson.M{"domain": rule.Domain}, bson.M{"$set": rule}, options.Update().SetUpsert(true))
 	if err != nil {
 		log.Printf("[WARN] failed to save, error=%v, article=%v", err, rule)
 		return rule, err
 	}
 	if ch.UpsertedID != nil {
-		rule.ID = ch.UpsertedID.(primitive.ObjectID)
+		if oid, ok := ch.UpsertedID.(primitive.ObjectID); ok {
+			rule.ID = oid
+		}
 	}
 	// if rule was updated, we have no id, so try to find it by domain
 	if rule.ID == primitive.NilObjectID {
@@ -86,13 +88,13 @@ func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
 
 // Disable marks enabled=false, by id
 func (r RulesDAO) Disable(ctx context.Context, id primitive.ObjectID) error {
-	_, err := r.Collection.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"enabled": false}})
+	_, err := r.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"enabled": false}})
 	return err
 }
 
 // All returns list of all rules, both enabled and disabled
 func (r RulesDAO) All(ctx context.Context) []Rule {
-	cursor, err := r.Collection.Find(ctx, bson.M{})
+	cursor, err := r.Find(ctx, bson.M{})
 	if err != nil {
 		log.Printf("[WARN] failed to retrieve all rules, error=%v", err)
 		return []Rule{}
