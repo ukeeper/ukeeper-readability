@@ -337,11 +337,11 @@ func TestServer_HandleIndex(t *testing.T) {
 	defer ts.Close()
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
-	// Add a test rule
+	// add a test rule
 	_, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
 
-	// Test index page
+	// test index page
 	resp, err := http.Get(ts.URL + "/")
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -359,7 +359,7 @@ func TestServer_HandleAdd(t *testing.T) {
 	ts, _ := startupT(t)
 	defer ts.Close()
 
-	// Test add page
+	// test add page
 	resp, err := http.Get(ts.URL + "/add/")
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -378,14 +378,14 @@ func TestServer_HandleEdit(t *testing.T) {
 
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
-	// Add a test rule
+	// add a test rule
 	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
 	var rule datastore.Rule
 	err = json.NewDecoder(r.Body).Decode(&rule)
 	require.NoError(t, err)
 
-	// Test edit page
+	// test edit page
 	resp, err := http.Get(ts.URL + "/edit/" + rule.ID.Hex())
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -398,7 +398,7 @@ func TestServer_HandleEdit(t *testing.T) {
 	assert.Contains(t, string(body), randomDomainName)
 	assert.Contains(t, string(body), "test content")
 
-	// Test edit page for non-existing rule
+	// test edit page for non-existing rule
 	resp, err = http.Get(ts.URL + "/edit/non-existing")
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -415,7 +415,7 @@ func TestServer_ToggleRule(t *testing.T) {
 	defer ts.Close()
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
-	// Add a test rule
+	// add a test rule
 	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
 	var rule datastore.Rule
@@ -425,7 +425,7 @@ func TestServer_ToggleRule(t *testing.T) {
 	assert.Equal(t, "test content", rule.Content)
 	assert.True(t, rule.Enabled)
 
-	// Toggle rule (disable)
+	// toggle rule (disable)
 	r, err = post(t, ts.URL+"/api/toggle-rule/"+rule.ID.Hex(), "")
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, r.StatusCode)
@@ -435,7 +435,7 @@ func TestServer_ToggleRule(t *testing.T) {
 	assert.NoError(t, r.Body.Close())
 	assert.Contains(t, string(body), `class="rules__row rules__row_disabled"`, string(body))
 
-	// Toggle rule again (enable)
+	// toggle rule again (enable)
 	r, err = post(t, ts.URL+"/api/toggle-rule/"+rule.ID.Hex(), "")
 	require.NoError(t, err)
 
@@ -451,7 +451,7 @@ func TestServer_ToggleRuleNotFound(t *testing.T) {
 	ts, _ := startupT(t)
 	defer ts.Close()
 
-	// Toggle rule (disable)
+	// toggle rule (disable)
 	r, err := post(t, ts.URL+"/api/toggle-rule/non-existing", "")
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, r.StatusCode)
@@ -468,7 +468,7 @@ func TestServer_SaveRule(t *testing.T) {
 
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
-	// Test saving a new rule
+	// test saving a new rule
 	resp, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content&author=test+author`, randomDomainName))
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -476,7 +476,7 @@ func TestServer_SaveRule(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "/", resp.Header.Get("HX-Redirect"))
 
-	// Test updating an existing rule
+	// test updating an existing rule
 	var rule datastore.Rule
 	err = json.NewDecoder(resp.Body).Decode(&rule)
 	require.NoError(t, err)
@@ -490,7 +490,7 @@ func TestServer_SaveRule(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "/", resp.Header.Get("HX-Redirect"))
 
-	// Verify the rule was updated
+	// verify the rule was updated
 	b, code := get(t, ts.URL)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Contains(t, b, "updated content")

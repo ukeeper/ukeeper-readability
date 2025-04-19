@@ -127,7 +127,7 @@ func (s *Server) handleAdd(w http.ResponseWriter, _ *http.Request) {
 		Rule  datastore.Rule
 	}{
 		Title: "Добавление правила",
-		Rule:  datastore.Rule{}, // Empty rule for the form
+		Rule:  datastore.Rule{}, // empty rule for the form
 	}
 	err := s.rulePage.ExecuteTemplate(w, "base.gohtml", data)
 	if err != nil {
@@ -227,7 +227,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] test urls: %v", testURLs)
 	log.Printf("[INFO] custom rule: %v", content)
 
-	// Create a temporary rule for extraction
+	// create a temporary rule for extraction
 	var tempRule *datastore.Rule
 	if content != "" {
 		tempRule = &datastore.Rule{
