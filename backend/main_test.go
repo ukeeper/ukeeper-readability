@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Main(t *testing.T) {
@@ -48,11 +49,11 @@ func Test_Main(t *testing.T) {
 
 	waitForHTTPServerStart(port)
 	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/ping", port))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "pong", string(body))
 }
 

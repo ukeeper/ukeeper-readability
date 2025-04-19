@@ -1,7 +1,8 @@
+version: "2"
 run:
   tests: false
-  timeout: 5m
 linters:
+  default: none
   enable:
     - bodyclose
     - copyloopvar
@@ -9,29 +10,74 @@ linters:
     - dupl
     - errcheck
     - gochecknoinits
+    - gocognit
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - misspell
     - nakedret
+    - nolintlint
+    - prealloc
     - revive
     - rowserrcheck
     - staticcheck
-    - stylecheck
-    - typecheck
+    - testifylint
     - unconvert
     - unparam
     - unused
     - whitespace
-  disable-all: true
-
-issues:
-  exclude-dirs:
-    - vendor
+  settings:
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: unused-receiver
+          disabled: true
+        - name: line-length-limit
+          disabled: true
+        - name: add-constant
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: function-length
+          disabled: true
+        - name: cyclomatic
+          disabled: true
+        - name: nested-structs
+          disabled: true
+    gocritic:
+      disabled-checks:
+        - hugeParam
+      enabled-tags:
+        - performance
+        - style
+        - experimental
+    govet:
+      enable:
+        - shadow
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

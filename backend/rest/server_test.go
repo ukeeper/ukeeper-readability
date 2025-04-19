@@ -32,7 +32,7 @@ func TestServer_FileServer(t *testing.T) {
 	testHTMLName := "test-ureadability.html"
 	dir := os.TempDir()
 	testHTMLFile := filepath.Join(dir, testHTMLName)
-	err := os.WriteFile(testHTMLFile, []byte("some html"), 0o700)
+	err := os.WriteFile(testHTMLFile, []byte("some html"), 0o600)
 	require.NoError(t, err)
 
 	srv := Server{
@@ -74,7 +74,7 @@ func TestServer_Shutdown(t *testing.T) {
 
 	st := time.Now()
 	srv.Run(ctx, "127.0.0.1", 0, "../web")
-	assert.True(t, time.Since(st).Seconds() < 1, "should take about 100ms")
+	assert.Less(t, time.Since(st), time.Second, "should take about 100ms")
 	<-done
 }
 
@@ -85,24 +85,24 @@ func TestServer_WrongAuth(t *testing.T) {
 	// no credentials
 	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequest("POST", ts.URL+"/api/rule", strings.NewReader("{}"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	r, err := client.Do(req)
 	require.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.Equal(t, http.StatusUnauthorized, r.StatusCode)
 
 	// wrong user
 	req.SetBasicAuth("wrong_user", "password")
 	r, err = client.Do(req)
 	require.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.Equal(t, http.StatusUnauthorized, r.StatusCode)
 
 	// wrong password
 	req.SetBasicAuth("admin", "wrong_password")
 	r, err = client.Do(req)
 	require.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.Equal(t, http.StatusUnauthorized, r.StatusCode)
 }
 
@@ -114,10 +114,10 @@ func TestServer_Extract(t *testing.T) {
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
 			testHTML, err := io.ReadAll(fh)
-			require.NoError(t, err)
-			require.NoError(t, fh.Close())
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
 			_, err = w.Write(testHTML)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			return
 		}
 	}))
@@ -126,14 +126,14 @@ func TestServer_Extract(t *testing.T) {
 	// happy path
 	resp, err := post(t, ts.URL+"/api/extract",
 		fmt.Sprintf(`{"url": "%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/"}`, tss.URL))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
-	assert.NoError(t, resp.Body.Close())
+	require.NoError(t, resp.Body.Close())
 	response := extractor.Response{}
 	err = json.Unmarshal(b, &response)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// legacy endpoint, same response is expected
 	legacyBody, code := get(t, ts.URL+"/api/content/v1/parser"+
@@ -141,32 +141,32 @@ func TestServer_Extract(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	legacyResponse := extractor.Response{}
 	err = json.Unmarshal([]byte(legacyBody), &legacyResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, response.Content, legacyResponse.Content)
 
 	// wrong body
 	resp, err = post(t, ts.URL+"/api/extract", "wrong_body")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err = io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode, string(b))
-	assert.NoError(t, resp.Body.Close())
+	require.NoError(t, resp.Body.Close())
 
 	// no URL
 	resp, err = post(t, ts.URL+"/api/extract", "{}")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err = io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(b))
-	assert.NoError(t, resp.Body.Close())
+	require.NoError(t, resp.Body.Close())
 
 	// bad URL
 	resp, err = post(t, ts.URL+"/api/extract", `{"url": "http://bad_url"}`)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err = io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(b))
-	assert.NoError(t, resp.Body.Close())
+	require.NoError(t, resp.Body.Close())
 }
 
 func TestServer_LegacyExtract(t *testing.T) {
@@ -177,10 +177,10 @@ func TestServer_LegacyExtract(t *testing.T) {
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
 			testHTML, err := io.ReadAll(fh)
-			require.NoError(t, err)
-			require.NoError(t, fh.Close())
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
 			_, err = w.Write(testHTML)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			return
 		}
 	}))
@@ -192,7 +192,7 @@ func TestServer_LegacyExtract(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	resp := extractor.Response{}
 	err := json.Unmarshal([]byte(b), &resp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, resp.Content)
 
 	// no url
@@ -200,7 +200,7 @@ func TestServer_LegacyExtract(t *testing.T) {
 	require.Equal(t, http.StatusExpectationFailed, code)
 	errResponse := rest.JSON{}
 	err = json.Unmarshal([]byte(b), &errResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "no url passed", errResponse["error"])
 
 	// wrong url
@@ -215,7 +215,7 @@ func TestServer_LegacyExtract(t *testing.T) {
 	assert.Equal(t, http.StatusExpectationFailed, code)
 	errResponse = rest.JSON{}
 	err = json.Unmarshal([]byte(b), &errResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "no token passed", errResponse["error"])
 
 	// wrong token
@@ -224,7 +224,7 @@ func TestServer_LegacyExtract(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, code)
 	errResponse = rest.JSON{}
 	err = json.Unmarshal([]byte(b), &errResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "wrong token passed", errResponse["error"])
 
 	// right token
@@ -246,7 +246,7 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	err = json.NewDecoder(r.Body).Decode(&rule)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, r.StatusCode)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.Equal(t, randomDomainName, rule.Domain)
 	assert.Equal(t, "test content", rule.Content)
 	ruleID := rule.ID.Hex()
@@ -265,12 +265,12 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 
 	// disable the rule
 	r, err = post(t, ts.URL+"/api/toggle-rule/"+rule.ID.Hex(), "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// read body for error message
 	body, err := io.ReadAll(r.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, r.StatusCode, string(body))
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 
 	// get the rule by ID, should look the same as "Enabled" status is only visible on the main page
 	b, code = get(t, ts.URL+"/edit/"+ruleID)
@@ -291,7 +291,7 @@ func TestServer_RuleHappyFlow(t *testing.T) {
 	err = json.NewDecoder(r.Body).Decode(&rule)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, r.StatusCode)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.Equal(t, randomDomainName, rule.Domain)
 	assert.Equal(t, "new content", rule.Content)
 	assert.Equal(t, ruleID, rule.ID.Hex())
@@ -305,8 +305,8 @@ func TestServer_RuleUnhappyFlow(t *testing.T) {
 	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", "")
 	require.NoError(t, err)
 	body, err := io.ReadAll(r.Body)
-	assert.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, err)
+	require.NoError(t, r.Body.Close())
 	require.Equal(t, http.StatusBadRequest, r.StatusCode)
 	assert.Equal(t, "Domain is required\n", string(body))
 
@@ -326,8 +326,8 @@ func TestServer_FakeAuth(t *testing.T) {
 	r, err := post(t, ts.URL+"/api/auth", `""`)
 	require.NoError(t, err)
 	body, err := io.ReadAll(r.Body)
-	assert.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, err)
+	require.NoError(t, r.Body.Close())
 	assert.Equal(t, http.StatusOK, r.StatusCode)
 	assert.Contains(t, string(body), `"pong":`)
 }
@@ -338,8 +338,9 @@ func TestServer_HandleIndex(t *testing.T) {
 	randomDomainName := randStringBytesRmndr(42) + ".com"
 
 	// add a test rule
-	_, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
+	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
+	require.NoError(t, r.Body.Close())
 
 	// test index page
 	resp, err := http.Get(ts.URL + "/")
@@ -381,6 +382,7 @@ func TestServer_HandleEdit(t *testing.T) {
 	// add a test rule
 	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
+	defer r.Body.Close()
 	var rule datastore.Rule
 	err = json.NewDecoder(r.Body).Decode(&rule)
 	require.NoError(t, err)
@@ -418,6 +420,7 @@ func TestServer_ToggleRule(t *testing.T) {
 	// add a test rule
 	r, err := postFormUrlencoded(t, ts.URL+"/api/rule", fmt.Sprintf(`domain=%s&content=test+content`, randomDomainName))
 	require.NoError(t, err)
+	defer r.Body.Close()
 	var rule datastore.Rule
 	err = json.NewDecoder(r.Body).Decode(&rule)
 	require.NoError(t, err)
@@ -432,7 +435,7 @@ func TestServer_ToggleRule(t *testing.T) {
 
 	body, err := io.ReadAll(r.Body)
 	require.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.Contains(t, string(body), `class="rules__row rules__row_disabled"`, string(body))
 
 	// toggle rule again (enable)
@@ -443,7 +446,7 @@ func TestServer_ToggleRule(t *testing.T) {
 
 	body, err = io.ReadAll(r.Body)
 	require.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.NotContains(t, string(body), `class="rules__row rules__row_disabled"`)
 }
 
@@ -458,7 +461,7 @@ func TestServer_ToggleRuleNotFound(t *testing.T) {
 
 	body, err := io.ReadAll(r.Body)
 	require.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, r.Body.Close())
 	assert.Contains(t, string(body), `Rule not found`, string(body))
 }
 
@@ -530,10 +533,10 @@ func TestServer_Preview(t *testing.T) {
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
 			testHTML, err := io.ReadAll(fh)
-			require.NoError(t, err)
-			require.NoError(t, fh.Close())
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
 			_, err = w.Write(testHTML)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			return
 		}
 	}))
@@ -542,30 +545,30 @@ func TestServer_Preview(t *testing.T) {
 	// happy path with no rule
 	resp, err := postFormUrlencoded(t, ts.URL+"/api/preview",
 		fmt.Sprintf(`test_urls=%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/&content=`, tss.URL))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
-	assert.NoError(t, resp.Body.Close())
+	require.NoError(t, resp.Body.Close())
 	assert.Contains(t, string(b), "<summary>Всем миром для общей пользы • Umputun тут был</summary>")
 
 	// happy path with custom rule
 	resp, err = postFormUrlencoded(t, ts.URL+"/api/preview",
 		fmt.Sprintf(`test_urls=%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/&content=article`, tss.URL))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err = io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
-	assert.NoError(t, resp.Body.Close())
+	require.NoError(t, resp.Body.Close())
 	assert.Contains(t, string(b), "Всем миром для общей пользы")
 
 	// no URL
 	resp, err = post(t, ts.URL+"/api/preview", "")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err = io.ReadAll(resp.Body)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
-	assert.NoError(t, resp.Body.Close())
+	require.NoError(t, resp.Body.Close())
 	assert.Contains(t, string(b), "No preview results available.")
 
 	// 10Mb body supposed to hit the form parsing limit
@@ -580,17 +583,17 @@ func TestServer_Preview(t *testing.T) {
 
 func get(t *testing.T, url string) (response string, statusCode int) {
 	r, err := http.Get(url)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	body, err := io.ReadAll(r.Body)
-	assert.NoError(t, err)
-	assert.NoError(t, r.Body.Close())
+	require.NoError(t, err)
+	require.NoError(t, r.Body.Close())
 	return string(body), r.StatusCode
 }
 
 func post(t *testing.T, url, body string) (*http.Response, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequest("POST", url, strings.NewReader(body))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.SetBasicAuth("admin", "password")
 	return client.Do(req)
 }
@@ -598,7 +601,7 @@ func post(t *testing.T, url, body string) (*http.Response, error) {
 func postFormUrlencoded(t *testing.T, url, body string) (*http.Response, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequest("POST", url, strings.NewReader(body))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth("admin", "password")
 	return client.Do(req)
@@ -611,7 +614,7 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 	}
 
 	db, err := datastore.New("mongodb://localhost:27017/", "test_ureadability", 0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	srv := Server{
 		Readability: extractor.UReadability{TimeOut: 30 * time.Second, SnippetSize: 300, Rules: db.GetStores()},
 		Credentials: map[string]string{"admin": "password"},

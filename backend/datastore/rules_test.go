@@ -28,7 +28,7 @@ func TestRules(t *testing.T) {
 
 	// save a rule
 	srule, err := rules.Save(context.Background(), rule)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, rule.Domain, srule.Domain)
 	ruleID := srule.ID
 
@@ -46,7 +46,7 @@ func TestRules(t *testing.T) {
 
 	// disable the rule
 	err = rules.Disable(context.Background(), grule.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotContains(t, rules.All(context.Background()), grule)
 
 	// get the rule by ID, should be marked as disabled
@@ -64,7 +64,7 @@ func TestRules(t *testing.T) {
 
 	// save a rule once more, should result in the same ID
 	updatedRule, err := rules.Save(context.Background(), rule)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, rule.Domain, updatedRule.Domain)
 	assert.Equal(t, ruleID, updatedRule.ID)
 }
@@ -84,7 +84,7 @@ func TestRulesCanceledContext(t *testing.T) {
 	rule := Rule{Domain: "example.com", Enabled: true}
 	srule, err := rules.Save(ctx, rule)
 	assert.Equal(t, rule, srule)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// retrieve a rule, wrong rule
 	grule, found := rules.Get(context.Background(), "http://user^:passwo^rd@foo.com/")
@@ -95,7 +95,7 @@ func TestRulesCanceledContext(t *testing.T) {
 	assert.Empty(t, grule, "canceled context")
 	assert.False(t, found, "canceled context")
 	assert.Empty(t, rules.All(ctx))
-	assert.Error(t, rules.Disable(ctx, rule.ID))
+	require.Error(t, rules.Disable(ctx, rule.ID))
 	// get a rule by ID with canceled context
 	grule, found = rules.GetByID(ctx, rule.ID)
 	assert.Empty(t, grule)

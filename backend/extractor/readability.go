@@ -74,7 +74,7 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	rb := &Response{}
 
 	httpClient := &http.Client{Timeout: f.TimeOut}
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		log.Printf("[WARN] failed to create request for %s, error=%v", reqURL, err)
 		return nil, err
@@ -180,7 +180,7 @@ func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule
 		r := f.Rules
 		if rule, found := r.Get(ctx, reqURL); found {
 			if content, rich, err = customParser(body, reqURL, rule); err == nil {
-				return content, rich, err
+				return content, rich, nil
 			}
 			log.Printf("[WARN] custom extractor failed for %s, error=%v", reqURL, err) // back to general parser
 		}
@@ -208,8 +208,8 @@ func (f *UReadability) normalizeLinks(data string, reqContext *http.Request) (re
 		dstLink := srcLink
 		if absLink, changed := absoluteLink(srcLink); changed {
 			dstLink = absLink
-			srcLink = fmt.Sprintf(`"%s"`, srcLink)
-			absLink = fmt.Sprintf(`"%s"`, absLink)
+			srcLink = fmt.Sprintf("%q", srcLink)
+			absLink = fmt.Sprintf("%q", absLink)
 			result = strings.ReplaceAll(result, srcLink, absLink)
 			log.Printf("[DEBUG] normalized %s -> %s", srcLink, dstLink)
 			normalizedCount++

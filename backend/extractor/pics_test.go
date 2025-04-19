@@ -20,10 +20,10 @@ func TestExtractPics(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")
 		testHTML, err := io.ReadAll(fh)
-		require.NoError(t, err)
-		require.NoError(t, fh.Close())
+		assert.NoError(t, err)
+		assert.NoError(t, fh.Close())
 		_, err = w.Write(testHTML)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}))
 	defer ts.Close()
 
@@ -51,7 +51,7 @@ func TestExtractPicsDirectly(t *testing.T) {
 		sel := d.Find("img")
 		im, allImages, ok := lr.extractPics(sel, "url")
 		assert.True(t, ok)
-		assert.Equal(t, 1, len(allImages))
+		assert.Len(t, allImages, 1)
 		assert.Equal(t, "https://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg", im)
 	})
 
@@ -73,7 +73,7 @@ func TestExtractPicsDirectly(t *testing.T) {
 		sel := d.Find("img")
 		im, allImages, ok := lr.extractPics(sel, "url")
 		assert.True(t, ok)
-		assert.Equal(t, 1, len(allImages))
+		assert.Len(t, allImages, 1)
 		assert.Equal(t, "http://bad_url", im)
 	})
 
@@ -82,13 +82,13 @@ func TestExtractPicsDirectly(t *testing.T) {
 			w.Header().Set("Content-Length", "1") // error on reading body
 		}))
 		defer ts.Close()
-		data := fmt.Sprintf(`<body><img src="%s"></body>`, ts.URL)
+		data := fmt.Sprintf(`<body><img src=%q></body>`, ts.URL)
 		d, err := goquery.NewDocumentFromReader(strings.NewReader(data))
 		require.NoError(t, err)
 		sel := d.Find("img")
 		im, allImages, ok := lr.extractPics(sel, "url")
 		assert.True(t, ok)
-		assert.Equal(t, 1, len(allImages))
+		assert.Len(t, allImages, 1)
 		assert.Equal(t, ts.URL, im)
 	})
 }
