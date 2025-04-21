@@ -18,7 +18,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	log "github.com/go-pkgz/lgr"
-	um "github.com/go-pkgz/rest"
+	"github.com/go-pkgz/rest"
 	"github.com/go-pkgz/rest/logger"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
@@ -70,9 +70,9 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 func (s *Server) routes(frontendDir string) chi.Router {
 	router := chi.NewRouter()
 
-	router.Use(middleware.RequestID, middleware.RealIP, um.Recoverer(log.Default()))
+	router.Use(middleware.RequestID, middleware.RealIP, rest.Recoverer(log.Default()))
 	router.Use(middleware.Throttle(1000), middleware.Timeout(60*time.Second))
-	router.Use(um.AppInfo("ureadability", "Umputun", s.Version), um.Ping)
+	router.Use(rest.AppInfo("ureadability", "Umputun", s.Version), rest.Ping)
 	router.Use(tollbooth_chi.LimitHandler(tollbooth.NewLimiter(50, nil)))
 
 	router.Use(logger.New(logger.Log(log.Default()), logger.WithBody, logger.Prefix("[INFO]")).Handler)
@@ -95,7 +95,7 @@ func (s *Server) routes(frontendDir string) chi.Router {
 	router.Get("/edit/{id}", s.handleEdit)
 
 	_ = os.Mkdir(filepath.Join(frontendDir, "static"), 0o700)
-	fs, err := um.NewFileServer("/", filepath.Join(frontendDir, "static"), um.FsOptSPA)
+	fs, err := rest.NewFileServer("/", filepath.Join(frontendDir, "static"), rest.FsOptSPA)
 	if err != nil {
 		log.Printf("[ERROR] unable to create file server, %v", err)
 		return nil
