@@ -80,6 +80,7 @@ func (s *Server) routes(frontendDir string) http.Handler {
 			api.HandleFunc("POST /extract", s.extractArticle)
 			api.HandleFunc("POST /auth", s.authFake)
 			api.HandleFunc("GET /metrics", s.handleMetrics)
+			api.HandleFunc("GET /content-parsed-wrong", s.contentParsedWrong)
 
 			// add protected group with its own set of middlewares
 			protectedGroup := api.Group()
@@ -213,6 +214,15 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 	if err != nil {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, err, "can't extract content")
 		return
+	}
+
+	if summary {
+		summaryText, err := s.Readability.GenerateSummary(r.Context(), res.Content)
+		if err != nil {
+			rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, fmt.Sprintf("failed to generate summary: %v", err))
+			return
+		}
+		res.Summary = summaryText
 	}
 
 	if summary {
@@ -407,6 +417,27 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		"version": s.Version,
 		"time":    time.Now().Format(time.RFC3339),
 	})
+}
+
+func (s *Server) contentParsedWrong(w http.ResponseWriter, r *http.Request) {
+	if s.Readability.OpenAIKey == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "OpenAI key is not set")
+		return
+	}
+
+	exampleURL := r.URL.Query().Get("url")
+	if exampleURL == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "url parameter is required")
+		return
+	}
+
+	message, err := s.Readability.ContentParsedWrong(r.Context(), exampleURL)
+	if err != nil {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, err.Error())
+		return
+	}
+
+	rest.RenderJSON(w, JSON{"message": message})
 }
 
 func getBid(id string) primitive.ObjectID {
