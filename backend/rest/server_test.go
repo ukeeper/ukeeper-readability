@@ -19,8 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
-	"github.com/ukeeper/ukeeper-redabilty/backend/extractor"
+	"github.com/ukeeper/ukeeper-readability/backend/datastore"
+	"github.com/ukeeper/ukeeper-readability/backend/extractor"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"
@@ -615,8 +615,14 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 
 	db, err := datastore.New("mongodb://localhost:27017/", "test_ureadability", 0)
 	require.NoError(t, err)
+
+	stores := db.GetStores()
 	srv := Server{
-		Readability: extractor.UReadability{TimeOut: 30 * time.Second, SnippetSize: 300, Rules: db.GetStores()},
+		Readability: extractor.UReadability{
+			TimeOut:     30 * time.Second,
+			SnippetSize: 300,
+			Rules:       stores.Rules,
+		},
 		Credentials: map[string]string{"admin": "password"},
 		Version:     "dev-test",
 	}

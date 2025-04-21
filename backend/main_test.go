@@ -23,9 +23,9 @@ func Test_Main(t *testing.T) {
 
 	port := chooseRandomUnusedPort()
 	os.Args = []string{"test", "--port=" + strconv.Itoa(port), "--dbg",
-		"--mongo_uri=mongodb://localhost:27017/",
+		"--mongo-uri=mongodb://localhost:27017/",
 		"--mongo-db=test_ureadability",
-		"--frontend_dir=web",
+		"--frontend-dir=web",
 	}
 
 	done := make(chan struct{})

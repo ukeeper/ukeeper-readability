@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
+	"github.com/ukeeper/ukeeper-readability/backend/datastore"
 )
 
 func TestExtractURL(t *testing.T) {
