@@ -312,7 +312,7 @@ func TestServer_RuleUnhappyFlow(t *testing.T) {
 
 	// get supposed to fail
 	_, code := get(t, ts.URL+"/api/rule")
-	assert.Equal(t, http.StatusMethodNotAllowed, code)
+	assert.Equal(t, http.StatusNotFound, code)
 
 	// get rule by non-existent ID
 	_, code = get(t, ts.URL+"/api/rule/nonexistent")

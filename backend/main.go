@@ -34,7 +34,6 @@ func main() {
 	if _, err := flags.Parse(&opts); err != nil {
 		os.Exit(1)
 	}
-	// Setup logging
 	var options []log.Option
 	if opts.Debug {
 		options = []log.Option{log.Debug, log.CallerFile}
