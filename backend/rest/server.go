@@ -12,14 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/didip/tollbooth/v7"
-	"github.com/didip/tollbooth_chi"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/render"
 	log "github.com/go-pkgz/lgr"
 	"github.com/go-pkgz/rest"
 	"github.com/go-pkgz/rest/logger"
+	"github.com/go-pkgz/routegroup"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
@@ -67,42 +63,36 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 	log.Printf("[WARN] http server terminated, %s", httpServer.ListenAndServe())
 }
 
-func (s *Server) routes(frontendDir string) chi.Router {
-	router := chi.NewRouter()
+func (s *Server) routes(frontendDir string) http.Handler {
+	router := routegroup.New(http.NewServeMux())
 
-	router.Use(middleware.RequestID, middleware.RealIP, rest.Recoverer(log.Default()))
-	router.Use(middleware.Throttle(1000), middleware.Timeout(60*time.Second))
+	router.Use(rest.Recoverer(log.Default()))
+	router.Use(rest.RealIP)
 	router.Use(rest.AppInfo("ureadability", "Umputun", s.Version), rest.Ping)
-	router.Use(tollbooth_chi.LimitHandler(tollbooth.NewLimiter(50, nil)))
-
+	router.Use(rest.Throttle(50))
 	router.Use(logger.New(logger.Log(log.Default()), logger.WithBody, logger.Prefix("[INFO]")).Handler)
 
-	router.Route("/api", func(r chi.Router) {
-		r.Get("/content/v1/parser", s.extractArticleEmulateReadability)
-		r.Post("/extract", s.extractArticle)
-		r.Post("/auth", s.authFake)
+	router.Route(func(api *routegroup.Bundle) {
+		api.Mount("/api").Route(func(api *routegroup.Bundle) {
+			api.HandleFunc("GET /content/v1/parser", s.extractArticleEmulateReadability)
+			api.HandleFunc("POST /extract", s.extractArticle)
+			api.HandleFunc("POST /auth", s.authFake)
 
-		r.Group(func(protected chi.Router) {
-			protected.Use(basicAuth("ureadability", s.Credentials))
-			protected.Post("/rule", s.saveRule)
-			protected.Post("/toggle-rule/{id}", s.toggleRule)
-			protected.Post("/preview", s.handlePreview)
+			// add protected group with its own set of middlewares
+			protectedGroup := api.Group()
+			protectedGroup.Use(basicAuth("ureadability", s.Credentials))
+			protectedGroup.HandleFunc("POST /rule", s.saveRule)
+			protectedGroup.HandleFunc("POST /toggle-rule/{id}", s.toggleRule)
+			protectedGroup.HandleFunc("POST /preview", s.handlePreview)
 		})
 	})
 
-	router.Get("/", s.handleIndex)
-	router.Get("/add/", s.handleAdd)
-	router.Get("/edit/{id}", s.handleEdit)
+	router.HandleFunc("GET /", s.handleIndex)
+	router.HandleFunc("GET /add/", s.handleAdd)
+	router.HandleFunc("GET /edit/{id}", s.handleEdit)
 
 	_ = os.Mkdir(filepath.Join(frontendDir, "static"), 0o700)
-	fs, err := rest.NewFileServer("/", filepath.Join(frontendDir, "static"), rest.FsOptSPA)
-	if err != nil {
-		log.Printf("[ERROR] unable to create file server, %v", err)
-		return nil
-	}
-	router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		fs.ServeHTTP(w, r)
-	})
+	router.HandleFiles("/", http.Dir(filepath.Join(frontendDir, "static")))
 	return router
 }
 
@@ -140,7 +130,7 @@ func (s *Server) handleAdd(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
-	id := getBid(chi.URLParam(r, "id"))
+	id := getBid(r.PathValue("id"))
 	rule, found := s.Readability.Rules.GetByID(r.Context(), id)
 	if !found {
 		http.Error(w, "Rule not found", http.StatusNotFound)
@@ -163,26 +153,23 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 	artRequest := extractor.Response{}
-	if err := render.DecodeJSON(r.Body, &artRequest); err != nil {
-		render.Status(r, http.StatusInternalServerError)
-		render.JSON(w, r, JSON{"error": err.Error()})
+	if err := rest.DecodeJSON(r, &artRequest); err != nil {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, "can't parse request")
 		return
 	}
 
 	if artRequest.URL == "" {
-		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, JSON{"error": "url parameter is required"})
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "url parameter is required")
 		return
 	}
 
 	res, err := s.Readability.Extract(r.Context(), artRequest.URL)
 	if err != nil {
-		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, JSON{"error": err.Error()})
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, err, "can't extract content")
 		return
 	}
 
-	render.JSON(w, r, &res)
+	rest.RenderJSON(w, &res)
 }
 
 // extractArticleEmulateReadability emulates readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
@@ -190,32 +177,28 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if s.Token != "" && token == "" {
-		render.Status(r, http.StatusExpectationFailed)
-		render.JSON(w, r, JSON{"error": "no token passed"})
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
 		return
 	}
 
 	if s.Token != "" && s.Token != token {
-		render.Status(r, http.StatusUnauthorized)
-		render.JSON(w, r, JSON{"error": "wrong token passed"})
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
 		return
 	}
 
 	extractURL := r.URL.Query().Get("url")
 	if extractURL == "" {
-		render.Status(r, http.StatusExpectationFailed)
-		render.JSON(w, r, JSON{"error": "no url passed"})
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no url passed")
 		return
 	}
 
 	res, err := s.Readability.Extract(r.Context(), extractURL)
 	if err != nil {
-		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, JSON{"error": err.Error()})
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, err, "can't extract content")
 		return
 	}
 
-	render.JSON(w, r, &res)
+	rest.RenderJSON(w, &res)
 }
 
 // generates previews for the provided test URLs
@@ -322,11 +305,11 @@ func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("HX-Redirect", "/")
-	render.JSON(w, r, &srule)
+	rest.RenderJSON(w, &srule)
 }
 
 func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
-	id := getBid(chi.URLParam(r, "id"))
+	id := getBid(r.PathValue("id"))
 	rule, found := s.Readability.Rules.GetByID(r.Context(), id)
 	if !found {
 		log.Printf("[WARN] rule not found for id: %s", id.Hex())
@@ -356,9 +339,9 @@ func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
 }
 
 // authFake just a dummy post request used for external check for protected resource
-func (s *Server) authFake(w http.ResponseWriter, r *http.Request) {
+func (s *Server) authFake(w http.ResponseWriter, _ *http.Request) {
 	t := time.Now()
-	render.JSON(w, r, JSON{"pong": t.Format("20060102150405")})
+	rest.RenderJSON(w, JSON{"pong": t.Format("20060102150405")})
 }
 
 func getBid(id string) primitive.ObjectID {
