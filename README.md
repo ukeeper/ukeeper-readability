@@ -1,4 +1,4 @@
-## ukeeper-readability [![build](https://github.com/ukeeper/ukeeper-redabilty/actions/workflows/ci.yml/badge.svg)](https://github.com/ukeeper/ukeeper-redabilty/actions/workflows/ci.yml) [![Coverage Status](https://coveralls.io/repos/github/ukeeper/ukeeper-readability/badge.svg?branch=master)](https://coveralls.io/github/ukeeper/ukeeper-readability?branch=master)
+## ukeeper-readability [![build](https://github.com/ukeeper/ukeeper-readability/actions/workflows/ci.yml/badge.svg)](https://github.com/ukeeper/ukeeper-readability/actions/workflows/ci.yml) [![Coverage Status](https://coveralls.io/repos/github/ukeeper/ukeeper-readability/badge.svg?branch=master)](https://coveralls.io/github/ukeeper/ukeeper-readability?branch=master)
 
 ### Running instructions
 
@@ -10,8 +10,8 @@
 |--------------|-----------------|----------------|-------------------------------------------------------|
 | address      | UKEEPER_ADDRESS | all interfaces | web server listening address                          |
 | port         | UKEEPER_PORT    | `8080`         | web server port                                       |
-| mongo_uri    | MONGO_URI       | none           | MongoDB connection string, _required_                 |
-| frontend_dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files                         |
+| mongo-uri    | MONGO_URI       | none           | MongoDB connection string, _required_                 |
+| frontend-dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files                         |
 | token        | TOKEN           | none           | token for /content/v1/parser endpoint auth            |
 | mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                                   |
 | mongo-db     | MONGO_DB        | `ureadability` | mongo database name                                   |

@@ -1,4 +1,4 @@
-module github.com/ukeeper/ukeeper-redabilty/backend
+module github.com/ukeeper/ukeeper-readability/backend
 
 go 1.23.0
 

@@ -19,7 +19,9 @@ func TestRules(t *testing.T) {
 	server, err := New("mongodb://localhost:27017/", "test_ureadability", 0)
 	require.NoError(t, err)
 	assert.NotNil(t, server.client)
-	rules := server.GetStores()
+	stores := server.GetStores()
+	assert.NotNil(t, stores)
+	rules := stores.Rules
 	assert.NotNil(t, rules)
 	rule := Rule{
 		Domain:  randStringBytesRmndr(42) + ".com",
@@ -74,7 +76,9 @@ func TestRulesCanceledContext(t *testing.T) {
 	server, err := New("mongodb://wrong", "", 0)
 	require.NoError(t, err)
 	assert.NotNil(t, server.client)
-	rules := server.GetStores()
+	stores := server.GetStores()
+	assert.NotNil(t, stores)
+	rules := stores.Rules
 	assert.NotNil(t, rules)
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -18,8 +18,8 @@ import (
 	"github.com/go-pkgz/routegroup"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/ukeeper/ukeeper-redabilty/backend/datastore"
-	"github.com/ukeeper/ukeeper-redabilty/backend/extractor"
+	"github.com/ukeeper/ukeeper-readability/backend/datastore"
+	"github.com/ukeeper/ukeeper-readability/backend/extractor"
 )
 
 // Server is a basic rest server providing access to store and invoking parser
@@ -176,6 +176,7 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
+
 	if s.Token != "" && token == "" {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
 		return
