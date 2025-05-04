@@ -3,24 +3,34 @@ package extractor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
+	"github.com/sashabaranov/go-openai"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-readability/backend/datastore"
 )
 
-// Rules interface with all methods to access datastore
-type Rules interface {
+//go:generate moq -out openai_mock.go . OpenAIClient
+
+// OpenAIClient defines interface for OpenAI API client
+type OpenAIClient interface {
+	CreateChatCompletion(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
+}
+
+// rulesProvider interface with all methods to access datastore
+type rulesProvider interface {
 	Get(ctx context.Context, rURL string) (datastore.Rule, bool)
 	GetByID(ctx context.Context, id primitive.ObjectID) (datastore.Rule, bool)
 	Save(ctx context.Context, rule datastore.Rule) (datastore.Rule, error)
@@ -28,15 +38,87 @@ type Rules interface {
 	All(ctx context.Context) []datastore.Rule
 }
 
+// Summaries interface with all methods to access summary cache
+//
+//go:generate moq -out summaries_mock.go . Summaries
+type Summaries interface {
+	Get(ctx context.Context, content string) (datastore.Summary, bool)
+	Save(ctx context.Context, summary datastore.Summary) error
+	Delete(ctx context.Context, contentHash string) error
+	CleanupExpired(ctx context.Context) (int64, error)
+}
+
+// SummaryMetrics contains metrics related to summary generation
+type SummaryMetrics struct {
+	CacheHits          int64         `json:"cache_hits"`
+	CacheMisses        int64         `json:"cache_misses"`
+	TotalRequests      int64         `json:"total_requests"`
+	FailedRequests     int64         `json:"failed_requests"`
+	AverageResponseMs  int64         `json:"average_response_ms"`
+	TotalResponseTimes time.Duration `json:"-"` // used to calculate average, not exported
+}
+
 // UReadability implements fetcher & extractor for local readability-like functionality
 type UReadability struct {
-	TimeOut     time.Duration
-	SnippetSize int
-	Rules       Rules
+	TimeOut          time.Duration
+	SnippetSize      int
+	Rules            rulesProvider
+	Summaries        Summaries
+	OpenAIKey        string
+	ModelType        string
+	OpenAIEnabled    bool
+	SummaryPrompt    string
+	MaxContentLength int
+	RequestsPerMin   int
+
+	apiClient     OpenAIClient
+	rateLimiter   *time.Ticker
+	requestsMutex sync.Mutex
+	metrics       SummaryMetrics
+	metricsMutex  sync.RWMutex
+}
+
+// SetAPIClient sets the API client for testing purposes
+func (f *UReadability) SetAPIClient(client OpenAIClient) {
+	f.apiClient = client
+}
+
+// StartCleanupTask starts a background task to periodically clean up expired summaries
+func (f *UReadability) StartCleanupTask(ctx context.Context, interval time.Duration) {
+	if f.Summaries == nil {
+		log.Printf("[WARN] summaries store is not configured, cleanup task not started")
+		return
+	}
+
+	if interval <= 0 {
+		interval = 24 * time.Hour // default to daily cleanup
+	}
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Printf("[INFO] running expired summaries cleanup task")
+				count, err := f.Summaries.CleanupExpired(ctx)
+				if err != nil {
+					log.Printf("[ERROR] failed to clean up expired summaries: %v", err)
+				} else {
+					log.Printf("[INFO] cleaned up %d expired summaries", count)
+				}
+			case <-ctx.Done():
+				log.Printf("[INFO] stopping summaries cleanup task")
+				return
+			}
+		}
+	}()
+	log.Printf("[INFO] started summaries cleanup task with interval %v", interval)
 }
 
 // Response from api calls
 type Response struct {
+	Summary     string   `json:"summary,omitempty"`
 	Content     string   `json:"content"`
 	Rich        string   `json:"rich_content"`
 	Domain      string   `json:"domain"`
@@ -58,6 +140,9 @@ var (
 
 const (
 	userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15"
+
+	// DefaultSummaryPrompt is the default prompt for generating article summaries
+	DefaultSummaryPrompt = "You are a helpful assistant that summarizes articles. Please summarize the main points in a few sentences as TLDR style (don't add a TLDR label). Then, list up to five detailed bullet points. Provide the response in plain text. Do not add any additional information. Do not add a Summary at the beginning of the response. If detailed bullet points are too similar to the summary, don't include them at all:"
 )
 
 // Extract fetches page and retrieves article
@@ -70,7 +155,177 @@ func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *d
 	return f.extractWithRules(ctx, reqURL, rule)
 }
 
-// ExtractWithRules is the core function that handles extraction with or without a specific rule
+// GetMetrics returns the current summary metrics
+func (f *UReadability) GetMetrics() SummaryMetrics {
+	f.metricsMutex.RLock()
+	defer f.metricsMutex.RUnlock()
+
+	// make a copy to ensure thread safety
+	metrics := f.metrics
+
+	// calculate average response time if we have any requests
+	if metrics.TotalRequests > 0 {
+		metrics.AverageResponseMs = int64(metrics.TotalResponseTimes/time.Millisecond) / metrics.TotalRequests
+	}
+
+	return metrics
+}
+
+// GenerateSummary creates a summary of the content using OpenAI
+func (f *UReadability) GenerateSummary(ctx context.Context, content string) (string, error) {
+	// check if OpenAI summarization is enabled
+	if !f.OpenAIEnabled {
+		return "", errors.New("summary generation is disabled")
+	}
+
+	// check if API key is available
+	if f.OpenAIKey == "" {
+		return "", errors.New("API key for summarization is not set")
+	}
+
+	// hash content for caching and detecting changes
+	contentHash := datastore.GenerateContentHash(content)
+
+	// check cache for existing summary
+	if f.Summaries != nil {
+		if cachedSummary, found := f.Summaries.Get(ctx, content); found {
+			// check if summary is valid and not expired
+			if cachedSummary.ExpiresAt.IsZero() || !time.Now().After(cachedSummary.ExpiresAt) {
+				log.Printf("[DEBUG] using cached summary for content")
+
+				// track cache hit
+				f.metricsMutex.Lock()
+				f.metrics.CacheHits++
+				f.metricsMutex.Unlock()
+
+				return cachedSummary.Summary, nil
+			}
+
+			log.Printf("[DEBUG] cached summary has expired, regenerating")
+		}
+	}
+
+	// track cache miss
+	f.metricsMutex.Lock()
+	f.metrics.CacheMisses++
+	f.metrics.TotalRequests++
+	f.metricsMutex.Unlock()
+
+	// apply content length limit if configured
+	if f.MaxContentLength > 0 && len(content) > f.MaxContentLength {
+		log.Printf("[DEBUG] content length (%d) exceeds maximum allowed (%d), truncating", len(content), f.MaxContentLength)
+		content = content[:f.MaxContentLength] + "..."
+	}
+
+	// initialize API client if not already set
+	if f.apiClient == nil {
+		f.apiClient = openai.NewClient(f.OpenAIKey)
+	}
+
+	// initialize rate limiter if needed and configured
+	f.requestsMutex.Lock()
+	shouldThrottle := f.RequestsPerMin > 0 && f.OpenAIKey != ""
+	if shouldThrottle && f.rateLimiter == nil {
+		interval := time.Minute / time.Duration(f.RequestsPerMin)
+		f.rateLimiter = time.NewTicker(interval)
+	}
+	f.requestsMutex.Unlock()
+
+	// apply rate limiting if enabled
+	if shouldThrottle {
+		select {
+		case <-f.rateLimiter.C:
+			// continue with the request
+			log.Printf("[DEBUG] rate limiter allowed request")
+		case <-ctx.Done():
+			// track failed request due to context cancellation
+			f.metricsMutex.Lock()
+			f.metrics.FailedRequests++
+			f.metricsMutex.Unlock()
+			return "", ctx.Err()
+		}
+	}
+
+	// set the model to use
+	model := openai.GPT4oMini
+	if f.ModelType != "" {
+		model = f.ModelType
+	}
+
+	// use custom prompt if provided, otherwise use default
+	prompt := DefaultSummaryPrompt
+	if f.SummaryPrompt != "" {
+		prompt = f.SummaryPrompt
+	}
+
+	// track response time
+	startTime := time.Now()
+
+	// make the API request
+	resp, err := f.apiClient.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: model,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: prompt,
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: content,
+				},
+			},
+		},
+	)
+
+	// calculate response time
+	responseTime := time.Since(startTime)
+
+	if err != nil {
+		log.Printf("[WARN] AI summarization failed: %v", err)
+
+		// track failed request
+		f.metricsMutex.Lock()
+		f.metrics.FailedRequests++
+		f.metricsMutex.Unlock()
+
+		return "", fmt.Errorf("failed to generate summary: %w", err)
+	}
+
+	// update metrics with response time
+	f.metricsMutex.Lock()
+	f.metrics.TotalResponseTimes += responseTime
+	f.metricsMutex.Unlock()
+
+	summary := resp.Choices[0].Message.Content
+
+	// cache the summary if storage is available
+	if f.Summaries != nil {
+		// set expiration time to 1 month from now
+		expiresAt := time.Now().AddDate(0, 1, 0)
+
+		err = f.Summaries.Save(ctx, datastore.Summary{
+			ID:        contentHash,
+			Content:   content,
+			Summary:   summary,
+			Model:     model,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			ExpiresAt: expiresAt,
+		})
+
+		if err != nil {
+			log.Printf("[WARN] failed to cache summary: %v", err)
+		} else {
+			log.Printf("[DEBUG] summary cached successfully")
+		}
+	}
+
+	return summary, nil
+}
+
+// extractWithRules is the core function that handles extraction with or without a specific rule
 func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	log.Printf("[INFO] extract %s", reqURL)
 	rb := &Response{}
