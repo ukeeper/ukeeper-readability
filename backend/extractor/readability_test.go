@@ -2,6 +2,7 @@ package extractor
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -206,4 +208,158 @@ func TestGetContentCustom(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, content, 6988)
 	assert.Len(t, rich, 7169)
+}
+
+func TestUReadability_GenerateSummary(t *testing.T) {
+	mockOpenAI := &OpenAIClientMock{
+		CreateChatCompletionFunc: func(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			return openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{
+					{
+						Message: openai.ChatCompletionMessage{
+							Content: "This is a summary of the article.",
+						},
+					},
+				},
+			}, nil
+		},
+	}
+
+	// cache hit test setup
+	cachedContent := "This is a cached content"
+	mockSummariesWithCache := &SummariesMock{
+		GetFunc: func(ctx context.Context, content string) (datastore.Summary, bool) {
+			if content == cachedContent {
+				return datastore.Summary{
+					ID:        "cached-id",
+					Content:   cachedContent,
+					Summary:   "This is a cached summary.",
+					Model:     "mini",
+					CreatedAt: time.Now(),
+				}, true
+			}
+			return datastore.Summary{}, false
+		},
+	}
+
+	// cache miss and save test setup
+	var savedSummary datastore.Summary
+	mockSummariesWithSave := &SummariesMock{
+		GetFunc: func(ctx context.Context, content string) (datastore.Summary, bool) {
+			return datastore.Summary{}, false
+		},
+		SaveFunc: func(ctx context.Context, summary datastore.Summary) error {
+			savedSummary = summary
+			return nil
+		},
+	}
+
+	// cache save error test setup
+	mockSummariesWithError := &SummariesMock{
+		GetFunc: func(ctx context.Context, content string) (datastore.Summary, bool) {
+			return datastore.Summary{}, false
+		},
+		SaveFunc: func(ctx context.Context, summary datastore.Summary) error {
+			return fmt.Errorf("failed to save summary")
+		},
+	}
+
+	tests := []struct {
+		name           string
+		content        string
+		apiKey         string
+		modelType      string
+		summaries      Summaries
+		expectedResult string
+		expectedError  string
+		checkSaved     bool
+	}{
+		{
+			name:           "Valid API Key and content",
+			content:        "This is a test article content.",
+			apiKey:         "test-key",
+			expectedResult: "This is a summary of the article.",
+			expectedError:  "",
+		},
+		{
+			name:           "No API Key",
+			content:        "This is a test article content.",
+			apiKey:         "",
+			expectedResult: "",
+			expectedError:  "API key for summarization is not set",
+		},
+		{
+			name:           "Cache hit",
+			content:        cachedContent,
+			apiKey:         "test-key",
+			summaries:      mockSummariesWithCache,
+			expectedResult: "This is a cached summary.",
+			expectedError:  "",
+		},
+		{
+			name:           "Cache miss with save",
+			content:        "This is uncached content",
+			apiKey:         "test-key",
+			modelType:      "non-default",
+			summaries:      mockSummariesWithSave,
+			expectedResult: "This is a summary of the article.",
+			expectedError:  "",
+			checkSaved:     true,
+		},
+		{
+			name:           "Cache save error",
+			content:        "This is uncached content",
+			apiKey:         "test-key",
+			summaries:      mockSummariesWithError,
+			expectedResult: "This is a summary of the article.",
+			expectedError:  "",
+		},
+		{
+			name:           "Direct model specification",
+			content:        "This is a test with direct model name.",
+			apiKey:         "test-key",
+			modelType:      "gpt-4o", // direct model specification
+			expectedResult: "This is a summary of the article.",
+			expectedError:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			readability := UReadability{
+				OpenAIKey:     tt.apiKey,
+				ModelType:     tt.modelType,
+				Summaries:     tt.summaries,
+				apiClient:     mockOpenAI,
+				OpenAIEnabled: true, // enable OpenAI for tests
+			}
+
+			result, err := readability.GenerateSummary(context.Background(), tt.content)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedResult, result)
+			}
+
+			if tt.checkSaved {
+				truncateLength := 1000
+				expectedContent := tt.content
+				if len(tt.content) > truncateLength {
+					expectedContent = tt.content[:truncateLength]
+				}
+				assert.Equal(t, expectedContent, savedSummary.Content)
+				assert.Equal(t, "This is a summary of the article.", savedSummary.Summary)
+
+				// check the saved model info
+				expectedModel := tt.modelType
+				if tt.modelType == "" {
+					expectedModel = openai.GPT4oMini // default model
+				}
+				assert.Equal(t, expectedModel, savedSummary.Model)
+			}
+		})
+	}
 }

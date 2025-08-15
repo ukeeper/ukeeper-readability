@@ -6,9 +6,11 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -77,6 +79,7 @@ func (s *Server) routes(frontendDir string) http.Handler {
 			api.HandleFunc("GET /content/v1/parser", s.extractArticleEmulateReadability)
 			api.HandleFunc("POST /extract", s.extractArticle)
 			api.HandleFunc("POST /auth", s.authFake)
+			api.HandleFunc("GET /metrics", s.handleMetrics)
 
 			// add protected group with its own set of middlewares
 			protectedGroup := api.Group()
@@ -176,10 +179,23 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
+	summary, _ := strconv.ParseBool(r.URL.Query().Get("summary"))
 
 	if s.Token != "" && token == "" {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
 		return
+	}
+
+	// check if summary is requested but token is not provided, or API key is not set
+	if summary {
+		if s.Readability.OpenAIKey == "" {
+			rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "OpenAI key is not set")
+			return
+		}
+		if s.Token == "" {
+			rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "summary generation requires token, but token is not set for the server")
+			return
+		}
 	}
 
 	if s.Token != "" && s.Token != token {
@@ -197,6 +213,15 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 	if err != nil {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, err, "can't extract content")
 		return
+	}
+
+	if summary {
+		summaryText, err := s.Readability.GenerateSummary(r.Context(), res.Content)
+		if err != nil {
+			rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, fmt.Sprintf("failed to generate summary: %v", err))
+			return
+		}
+		res.Summary = summaryText
 	}
 
 	rest.RenderJSON(w, &res)
@@ -238,6 +263,16 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// generate summary if API key is available
+		if s.Readability.OpenAIKey != "" {
+			result.Summary, e = s.Readability.GenerateSummary(r.Context(), result.Content)
+			if e != nil {
+				log.Printf("[WARN] failed to generate summary for preview of %s: %v", url, e)
+			} else {
+				log.Printf("[DEBUG] summary generated successfully for preview of %s", url)
+			}
+		}
+
 		responses = append(responses, *result)
 	}
 
@@ -248,6 +283,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		Excerpt string
 		Rich    template.HTML
 		Content string
+		Summary template.HTML
 	}
 
 	results := make([]result, 0, len(responses))
@@ -259,6 +295,8 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			//nolint:gosec // this content is escaped by Extractor, so it's safe to use it as is
 			Rich:    template.HTML(r.Rich),
 			Content: r.Content,
+			//nolint:gosec // we do not expect CSS from OpenAI response
+			Summary: template.HTML(strings.ReplaceAll(r.Summary, "\n", "<br>")),
 		})
 	}
 
@@ -343,6 +381,32 @@ func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) authFake(w http.ResponseWriter, _ *http.Request) {
 	t := time.Now()
 	rest.RenderJSON(w, JSON{"pong": t.Format("20060102150405")})
+}
+
+// handleMetrics returns summary generation metrics
+func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
+	metrics := s.Readability.GetMetrics()
+
+	// calculate hit ratio
+	hitRatio := float64(0)
+	if metrics.CacheHits+metrics.CacheMisses > 0 {
+		hitRatio = float64(metrics.CacheHits) / float64(metrics.CacheHits+metrics.CacheMisses)
+	}
+
+	// get metrics from the UReadability instance
+	rest.RenderJSON(w, JSON{
+		"summary": JSON{
+			"cache_hits":          metrics.CacheHits,
+			"cache_misses":        metrics.CacheMisses,
+			"cache_hit_ratio":     hitRatio,
+			"total_requests":      metrics.TotalRequests,
+			"failed_requests":     metrics.FailedRequests,
+			"average_response_ms": metrics.AverageResponseMs,
+			"success_rate":        float64(metrics.TotalRequests-metrics.FailedRequests) / float64(math.Max(1, float64(metrics.TotalRequests))),
+		},
+		"version": s.Version,
+		"time":    time.Now().Format(time.RFC3339),
+	})
 }
 
 func getBid(id string) primitive.ObjectID {

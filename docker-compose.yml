@@ -18,7 +18,7 @@ services:
       - MONGO_URI=mongodb://root:Squid3kIc6Dew4ad8Ci5@mongo:27017
       - MONGO_DELAY=10s
       - CREDS=admin:jpm6AQH!kbx2tvk!fqc
-      #- OPENAI_KEY=insert_key_here
+      #- OPENAI_API_KEY=insert_key_here
 
     ports:
       - "8080:8080"
