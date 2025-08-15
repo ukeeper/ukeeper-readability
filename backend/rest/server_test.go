@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/go-pkgz/rest"
+	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -581,6 +582,172 @@ func TestServer_Preview(t *testing.T) {
 	assert.Contains(t, string(b), "Failed to parse form")
 }
 
+func TestServer_ExtractArticleEmulateReadabilityWithSummaryFailures(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("<html><body><p>This is a test article.</p></body></html>"))
+	}))
+	defer ts.Close()
+
+	// create a mock version of the Summaries interface
+	mockSummaries := &extractor.SummariesMock{
+		GetFunc: func(ctx context.Context, content string) (datastore.Summary, bool) {
+			return datastore.Summary{}, false
+		},
+		SaveFunc: func(ctx context.Context, summary datastore.Summary) error {
+			return nil
+		},
+	}
+
+	tests := []struct {
+		name           string
+		serverToken    string
+		url            string
+		token          string
+		summary        bool
+		expectedStatus int
+		expectedError  string
+		openAIKey      string
+		openAIModel    string
+	}{
+		{
+			name:           "Valid token and summary, no OpenAI key",
+			serverToken:    "secret",
+			url:            ts.URL,
+			token:          "secret",
+			summary:        true,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "OpenAI key is not set",
+		},
+		{
+			name:           "No token, summary requested",
+			serverToken:    "secret",
+			url:            ts.URL,
+			summary:        true,
+			expectedStatus: http.StatusExpectationFailed,
+			expectedError:  "no token passed",
+		},
+		{
+			name:           "Invalid token, summary requested",
+			serverToken:    "secret",
+			url:            ts.URL,
+			token:          "wrong",
+			summary:        true,
+			expectedStatus: http.StatusUnauthorized,
+			expectedError:  "wrong token passed",
+			openAIKey:      "test key",
+		},
+		{
+			name:           "Valid token, no summary",
+			serverToken:    "secret",
+			url:            ts.URL,
+			token:          "secret",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "No token, no summary",
+			serverToken:    "secret",
+			url:            ts.URL,
+			expectedStatus: http.StatusExpectationFailed,
+		},
+		{
+			name:           "Server token not set, summary requested",
+			serverToken:    "",
+			url:            ts.URL,
+			token:          "any",
+			summary:        true,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "summary generation requires token, but token is not set for the server",
+			openAIKey:      "test key",
+		},
+		{
+			name:           "Server token not set, no summary",
+			serverToken:    "",
+			url:            ts.URL,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Valid token and summary with custom model",
+			serverToken:    "secret",
+			url:            ts.URL,
+			token:          "secret",
+			summary:        true,
+			expectedStatus: http.StatusOK,
+			openAIKey:      "test key",
+			openAIModel:    "gpt-4o",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := Server{
+				Readability: extractor.UReadability{
+					TimeOut:       30 * time.Second,
+					SnippetSize:   300,
+					Rules:         nil,
+					Summaries:     mockSummaries,
+					OpenAIKey:     tt.openAIKey,
+					OpenAIEnabled: true, // enable OpenAI for tests
+					ModelType:     tt.openAIModel,
+				},
+				Token: tt.serverToken,
+			}
+
+			// set the API client for testing
+			mockClient := &extractor.OpenAIClientMock{
+				CreateChatCompletionFunc: func(ctx context.Context, request openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+					model := "gpt-4o-mini"
+					if tt.openAIModel != "" {
+						model = tt.openAIModel
+					}
+					assert.Equal(t, model, request.Model)
+					return openai.ChatCompletionResponse{
+						Choices: []openai.ChatCompletionChoice{
+							{
+								Message: openai.ChatCompletionMessage{
+									Content: "This is a summary of the article.",
+								},
+							},
+						},
+					}, nil
+				},
+			}
+			srv.Readability.SetAPIClient(mockClient)
+
+			//}
+
+			url := fmt.Sprintf("/api/content/v1/parser?url=%s", tt.url)
+			if tt.token != "" {
+				url += fmt.Sprintf("&token=%s", tt.token)
+			}
+			if tt.summary {
+				url += "&summary=true"
+			}
+
+			req, err := http.NewRequest("GET", url, nil)
+			require.NoError(t, err)
+
+			rr := httptest.NewRecorder()
+			srv.extractArticleEmulateReadability(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code, rr.Body.String())
+
+			if tt.expectedError != "" {
+				var errorResponse map[string]string
+				err = json.Unmarshal(rr.Body.Bytes(), &errorResponse)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedError, errorResponse["error"])
+			} else if tt.summary && tt.openAIKey != "" {
+				var response extractor.Response
+				err = json.Unmarshal(rr.Body.Bytes(), &response)
+				require.NoError(t, err)
+				assert.NotEmpty(t, response.Content)
+				assert.Equal(t, "This is a summary of the article.", response.Summary)
+			}
+		})
+	}
+}
+
 func get(t *testing.T, url string) (response string, statusCode int) {
 	r, err := http.Get(url)
 	require.NoError(t, err)
@@ -622,6 +789,8 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 			TimeOut:     30 * time.Second,
 			SnippetSize: 300,
 			Rules:       stores.Rules,
+			Summaries:   stores.Summaries,
+			ModelType:   "mini",
 		},
 		Credentials: map[string]string{"admin": "password"},
 		Version:     "dev-test",
