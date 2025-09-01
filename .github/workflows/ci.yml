@@ -24,7 +24,7 @@ jobs:
           mongoDBVersion: "5.0"
 
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: build and test
         working-directory: backend
@@ -36,7 +36,7 @@ jobs:
           ENABLE_MONGO_TESTS: "true"
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           working-directory: backend
