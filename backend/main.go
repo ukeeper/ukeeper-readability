@@ -63,7 +63,7 @@ func main() {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 		<-stop
-		log.Printf("[WARN] interrupt signal")
+		log.Print("[WARN] interrupt signal")
 		cancel()
 	}()
 
