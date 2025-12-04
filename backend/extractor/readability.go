@@ -187,7 +187,7 @@ func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule
 			log.Printf("[WARN] custom extractor failed for %s, error=%v", reqURL, err) // back to general parser
 		}
 	} else {
-		log.Printf("[DEBUG] no rules defined!")
+		log.Print("[DEBUG] no rules defined!")
 	}
 
 	return genParser(body, reqURL)
