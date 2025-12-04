@@ -23,12 +23,10 @@ func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (main
 
 	iselect.Each(func(_ int, s *goquery.Selection) {
 		if im, ok := s.Attr("src"); ok {
-			wg.Add(1)
-			go func(url string) {
-				size := f.getImageSize(url)
-				resCh <- imgInfo{url: url, size: size}
-				wg.Done()
-			}(im)
+			wg.Go(func() {
+				size := f.getImageSize(im)
+				resCh <- imgInfo{url: im, size: size}
+			})
 		}
 	})
 
