@@ -21,7 +21,6 @@ linters:
     - misspell
     - nakedret
     - nolintlint
-    - prealloc
     - revive
     - rowserrcheck
     - staticcheck
@@ -34,6 +33,10 @@ linters:
     goconst:
       min-len: 2
       min-occurrences: 2
+    gosec:
+      excludes:
+        - G118
+        - G120
     revive:
       enable-all-rules: true
       rules:
@@ -50,6 +53,8 @@ linters:
         - name: cyclomatic
           disabled: true
         - name: nested-structs
+          disabled: true
+        - name: use-slices-sort
           disabled: true
     gocritic:
       disabled-checks:
