@@ -34,12 +34,7 @@ func main() {
 	if _, err := flags.Parse(&opts); err != nil {
 		os.Exit(1)
 	}
-	var options []log.Option
-	if opts.Debug {
-		options = []log.Option{log.Debug, log.CallerFile}
-	}
-	options = append(options, log.Msec, log.LevelBraces)
-	log.Setup(options...)
+	setupLog(opts.Debug, opts.MongoURI, opts.Token)
 
 	log.Printf("[INFO] started ukeeper-readability service %s", revision)
 	db, err := datastore.New(opts.MongoURI, opts.MongoDB, opts.MongoDelay)
@@ -68,4 +63,13 @@ func main() {
 	}()
 
 	srv.Run(ctx, opts.Address, opts.Port, opts.FrontendDir)
+}
+
+func setupLog(dbg bool, secrets ...string) { //nolint:revive // control flag is fine for init helper
+	log.Secret(secrets...)
+	if dbg {
+		log.Setup(log.Debug, log.CallerFile, log.Msec, log.LevelBraces)
+		return
+	}
+	log.Setup(log.Msec, log.LevelBraces)
 }

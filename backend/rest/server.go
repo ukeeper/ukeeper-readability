@@ -204,8 +204,8 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 
 // generates previews for the provided test URLs
 func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20) // limit to 64MB
+	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
@@ -268,8 +268,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		Results: results,
 	}
 
-	err = s.rulePage.ExecuteTemplate(w, "preview.gohtml", data)
-	if err != nil {
+	if err := s.rulePage.ExecuteTemplate(w, "preview.gohtml", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -277,8 +276,8 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 // saveRule upsert rule, forcing enabled=true
 func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20) // limit to 64MB
+	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}

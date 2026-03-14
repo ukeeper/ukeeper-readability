@@ -1,9 +1,10 @@
 package extractor
 
 import (
+	"cmp"
 	"io"
 	"net/http"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (main
 		images[r.size] = r.url
 		allImages = append(allImages, r.url)
 	}
-	sort.Strings(allImages)
+	slices.Sort(allImages)
 	if len(images) == 0 {
 		return "", nil, false
 	}
@@ -49,7 +50,7 @@ func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (main
 	for k := range images {
 		keys = append(keys, k)
 	}
-	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
+	slices.SortFunc(keys, func(a, b int) int { return cmp.Compare(b, a) })
 	mainImage = images[keys[0]]
 	log.Printf("[DEBUG] total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
 	return mainImage, allImages, true
