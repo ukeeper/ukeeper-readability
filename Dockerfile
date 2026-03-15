@@ -1,5 +1,5 @@
 # Build
-FROM umputun/baseimage:buildgo-latest as build-backend
+FROM umputun/baseimage:buildgo-latest AS build-backend
 
 ARG CI
 ARG GITHUB_REF
