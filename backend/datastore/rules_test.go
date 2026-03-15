@@ -3,110 +3,233 @@ package datastore
 import (
 	"context"
 	"math/rand/v2"
-	"os"
 	"testing"
 
+	"github.com/go-pkgz/testutils/containers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"
 
-func TestRules(t *testing.T) {
-	if _, ok := os.LookupEnv("ENABLE_MONGO_TESTS"); !ok {
-		t.Skip("ENABLE_MONGO_TESTS env variable is not set")
-	}
-	server, err := New("mongodb://localhost:27017/", "test_ureadability", 0)
-	require.NoError(t, err)
-	assert.NotNil(t, server.client)
-	stores := server.GetStores()
-	assert.NotNil(t, stores)
-	rules := stores.Rules
-	assert.NotNil(t, rules)
+func TestRulesSave(t *testing.T) {
+	rules := setupRules(t)
+
+	t.Run("save new rule", func(t *testing.T) {
+		rule := Rule{Domain: randDomain(), Content: "article p", Enabled: true}
+		saved, err := rules.Save(context.Background(), rule)
+		require.NoError(t, err)
+		assert.Equal(t, rule.Domain, saved.Domain)
+		assert.Equal(t, rule.Content, saved.Content)
+		assert.True(t, saved.Enabled)
+		assert.NotEqual(t, primitive.NilObjectID, saved.ID)
+	})
+
+	t.Run("upsert same domain preserves id", func(t *testing.T) {
+		domain := randDomain()
+		rule := Rule{Domain: domain, Content: "original", Enabled: true}
+		saved, err := rules.Save(context.Background(), rule)
+		require.NoError(t, err)
+		origID := saved.ID
+
+		updated := Rule{Domain: domain, Content: "updated", Enabled: true}
+		saved, err = rules.Save(context.Background(), updated)
+		require.NoError(t, err)
+		assert.Equal(t, origID, saved.ID)
+		assert.Equal(t, "updated", saved.Content)
+	})
+
+	t.Run("save with all fields", func(t *testing.T) {
+		rule := Rule{
+			Domain:    randDomain(),
+			Content:   ".post-content",
+			Author:    "test-author",
+			MatchURLs: []string{"/blog/*"},
+			Excludes:  []string{".sidebar"},
+			TestURLs:  []string{"https://example.com/test"},
+			Enabled:   true,
+		}
+		saved, err := rules.Save(context.Background(), rule)
+		require.NoError(t, err)
+		assert.Equal(t, rule.Domain, saved.Domain)
+		assert.Equal(t, rule.Author, saved.Author)
+		assert.Equal(t, rule.MatchURLs, saved.MatchURLs)
+		assert.Equal(t, rule.Excludes, saved.Excludes)
+		assert.Equal(t, rule.TestURLs, saved.TestURLs)
+	})
+
+	t.Run("save with canceled context", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		rule := Rule{Domain: "example.com", Enabled: true}
+		_, err := rules.Save(ctx, rule)
+		require.Error(t, err)
+	})
+}
+
+func TestRulesGet(t *testing.T) {
+	rules := setupRules(t)
+
+	t.Run("get existing enabled rule by url", func(t *testing.T) {
+		domain := randDomain()
+		rule := Rule{Domain: domain, Content: "article", Enabled: true}
+		_, err := rules.Save(context.Background(), rule)
+		require.NoError(t, err)
+
+		found, ok := rules.Get(context.Background(), "https://"+domain+"/some/path")
+		assert.True(t, ok)
+		assert.Equal(t, domain, found.Domain)
+		assert.Equal(t, "article", found.Content)
+	})
+
+	t.Run("disabled rule not found", func(t *testing.T) {
+		domain := randDomain()
+		rule := Rule{Domain: domain, Content: "article", Enabled: true}
+		saved, err := rules.Save(context.Background(), rule)
+		require.NoError(t, err)
+		err = rules.Disable(context.Background(), saved.ID)
+		require.NoError(t, err)
+
+		_, ok := rules.Get(context.Background(), "https://"+domain+"/page")
+		assert.False(t, ok)
+	})
+
+	t.Run("non-existing domain", func(t *testing.T) {
+		found, ok := rules.Get(context.Background(), "https://nonexistent-domain-xyz.com/page")
+		assert.False(t, ok)
+		assert.Empty(t, found.Domain)
+	})
+
+	t.Run("invalid url", func(t *testing.T) {
+		found, ok := rules.Get(context.Background(), "http://user^:passwo^rd@foo.com/")
+		assert.False(t, ok)
+		assert.Empty(t, found)
+	})
+
+	t.Run("canceled context", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, ok := rules.Get(ctx, "https://example.com")
+		assert.False(t, ok)
+	})
+}
+
+func TestRulesGetByID(t *testing.T) {
+	rules := setupRules(t)
+
+	t.Run("existing rule", func(t *testing.T) {
+		rule := Rule{Domain: randDomain(), Content: "article", Enabled: true}
+		saved, err := rules.Save(context.Background(), rule)
+		require.NoError(t, err)
+
+		found, ok := rules.GetByID(context.Background(), saved.ID)
+		assert.True(t, ok)
+		assert.Equal(t, saved.ID, found.ID)
+		assert.Equal(t, rule.Domain, found.Domain)
+	})
+
+	t.Run("non-existing id", func(t *testing.T) {
+		_, ok := rules.GetByID(context.Background(), primitive.NewObjectID())
+		assert.False(t, ok)
+	})
+
+	t.Run("nil object id", func(t *testing.T) {
+		_, ok := rules.GetByID(context.Background(), primitive.NilObjectID)
+		assert.False(t, ok)
+	})
+}
+
+func TestRulesDisable(t *testing.T) {
+	rules := setupRules(t)
+
+	t.Run("disable existing rule", func(t *testing.T) {
+		rule := Rule{Domain: randDomain(), Enabled: true}
+		saved, err := rules.Save(context.Background(), rule)
+		require.NoError(t, err)
+		assert.True(t, saved.Enabled)
+
+		err = rules.Disable(context.Background(), saved.ID)
+		require.NoError(t, err)
+
+		found, ok := rules.GetByID(context.Background(), saved.ID)
+		assert.True(t, ok)
+		assert.False(t, found.Enabled)
+	})
+
+	t.Run("disable non-existing id does not error", func(t *testing.T) {
+		err := rules.Disable(context.Background(), primitive.NewObjectID())
+		require.NoError(t, err) // mongo UpdateOne with no match is not an error
+	})
+}
+
+func TestRulesAll(t *testing.T) {
+	rules := setupRules(t)
+
+	t.Run("returns all rules including disabled", func(t *testing.T) {
+		domain1 := randDomain()
+		domain2 := randDomain()
+		_, err := rules.Save(context.Background(), Rule{Domain: domain1, Content: "a", Enabled: true})
+		require.NoError(t, err)
+		saved2, err := rules.Save(context.Background(), Rule{Domain: domain2, Content: "b", Enabled: true})
+		require.NoError(t, err)
+		err = rules.Disable(context.Background(), saved2.ID)
+		require.NoError(t, err)
+
+		all := rules.All(context.Background())
+		assert.GreaterOrEqual(t, len(all), 2)
+
+		var foundEnabled, foundDisabled bool
+		for _, r := range all {
+			if r.Domain == domain1 {
+				foundEnabled = true
+				assert.True(t, r.Enabled)
+			}
+			if r.Domain == domain2 {
+				foundDisabled = true
+				assert.False(t, r.Enabled)
+			}
+		}
+		assert.True(t, foundEnabled, "enabled rule should be in All()")
+		assert.True(t, foundDisabled, "disabled rule should be in All()")
+	})
+
+	t.Run("canceled context returns empty", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		all := rules.All(ctx)
+		assert.Empty(t, all)
+	})
+}
+
+func TestRuleString(t *testing.T) {
 	rule := Rule{
-		Domain:  randStringBytesRmndr(42) + ".com",
+		ID:      primitive.NewObjectID(),
+		Domain:  "example.com",
+		Content: ".article",
 		Enabled: true,
 	}
-
-	// save a rule
-	srule, err := rules.Save(context.Background(), rule)
-	require.NoError(t, err)
-	assert.Equal(t, rule.Domain, srule.Domain)
-	ruleID := srule.ID
-
-	// get the rule we just saved by domain
-	grule, found := rules.Get(context.Background(), "https://"+rule.Domain)
-	assert.True(t, found)
-	assert.Equal(t, rule.Domain, grule.Domain)
-	assert.Equal(t, ruleID, grule.ID)
-	assert.Contains(t, rules.All(context.Background()), grule)
-
-	// get the rule by ID
-	idrule, found := rules.GetByID(context.Background(), ruleID)
-	assert.True(t, found)
-	assert.Equal(t, grule, idrule)
-
-	// disable the rule
-	err = rules.Disable(context.Background(), grule.ID)
-	require.NoError(t, err)
-	assert.NotContains(t, rules.All(context.Background()), grule)
-
-	// get the rule by ID, should be marked as disabled
-	idrule, found = rules.GetByID(context.Background(), grule.ID)
-	assert.True(t, found)
-	assert.Equal(t, rule.Domain, grule.Domain)
-	assert.False(t, idrule.Enabled)
-	// same disabled rule still should appear in All call
-	assert.Contains(t, rules.All(context.Background()), idrule)
-
-	// get the disabled rule by domain, should not be found
-	grule, found = rules.Get(context.Background(), "https://"+rule.Domain)
-	assert.False(t, found)
-	assert.Empty(t, grule.Domain)
-
-	// save a rule once more, should result in the same ID
-	updatedRule, err := rules.Save(context.Background(), rule)
-	require.NoError(t, err)
-	assert.Equal(t, rule.Domain, updatedRule.Domain)
-	assert.Equal(t, ruleID, updatedRule.ID)
+	s := rule.String()
+	assert.Contains(t, s, "example.com")
+	assert.Contains(t, s, ".article")
+	assert.Contains(t, s, "enabled=true")
 }
 
-func TestRulesCanceledContext(t *testing.T) {
-	// we're not making requests to MongoDB, so it's ok to have no working connection
-	server, err := New("mongodb://wrong", "", 0)
+func setupRules(t *testing.T) RulesDAO {
+	t.Helper()
+	mc := containers.NewMongoTestContainer(context.Background(), t, 5)
+	t.Cleanup(func() { mc.Close(context.Background()) }) //nolint:errcheck
+
+	server, err := New(mc.URI, "test_ureadability", 0)
 	require.NoError(t, err)
-	assert.NotNil(t, server.client)
 	stores := server.GetStores()
-	assert.NotNil(t, stores)
-	rules := stores.Rules
-	assert.NotNil(t, rules)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	// save a rule with canceled context
-	rule := Rule{Domain: "example.com", Enabled: true}
-	srule, err := rules.Save(ctx, rule)
-	assert.Equal(t, rule, srule)
-	require.Error(t, err)
-
-	// retrieve a rule, wrong rule
-	grule, found := rules.Get(context.Background(), "http://user^:passwo^rd@foo.com/")
-	assert.Empty(t, grule, "wrong URL")
-	assert.False(t, found, "wrong URL")
-	// retrieve a rule with canceled context
-	grule, found = rules.Get(ctx, "")
-	assert.Empty(t, grule, "canceled context")
-	assert.False(t, found, "canceled context")
-	assert.Empty(t, rules.All(ctx))
-	require.Error(t, rules.Disable(ctx, rule.ID))
-	// get a rule by ID with canceled context
-	grule, found = rules.GetByID(ctx, rule.ID)
-	assert.Empty(t, grule)
-	assert.False(t, found)
+	return stores.Rules
 }
 
-// thanks to https://stackoverflow.com/a/31832326/961092
+func randDomain() string {
+	return randStringBytesRmndr(20) + ".com"
+}
+
 func randStringBytesRmndr(n int) string {
 	b := make([]byte, n)
 	for i := range b {

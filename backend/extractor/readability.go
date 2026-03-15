@@ -19,6 +19,8 @@ import (
 	"github.com/ukeeper/ukeeper-readability/backend/datastore"
 )
 
+//go:generate moq -out mocks/rules.go -pkg mocks -skip-ensure -fmt goimports . Rules
+
 // Rules interface with all methods to access datastore
 type Rules interface {
 	Get(ctx context.Context, rURL string) (datastore.Rule, bool)

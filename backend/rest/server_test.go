@@ -9,26 +9,27 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-pkgz/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-readability/backend/datastore"
 	"github.com/ukeeper/ukeeper-readability/backend/extractor"
+	"github.com/ukeeper/ukeeper-readability/backend/extractor/mocks"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"
 
 func TestServer_FileServer(t *testing.T) {
-	if _, ok := os.LookupEnv("ENABLE_MONGO_TESTS"); !ok {
-		t.Skip("ENABLE_MONGO_TESTS env variable is not set")
-	}
 	testHTMLName := "test-ureadability.html"
 	dir := os.TempDir()
 	testHTMLFile := filepath.Join(dir, testHTMLName)
@@ -607,21 +608,15 @@ func postFormUrlencoded(t *testing.T, url, body string) (*http.Response, error) 
 	return client.Do(req)
 }
 
-// startupT runs fully configured testing server
+// startupT runs fully configured testing server with in-memory rules store
 func startupT(t *testing.T) (*httptest.Server, *Server) {
-	if _, ok := os.LookupEnv("ENABLE_MONGO_TESTS"); !ok {
-		t.Skip("ENABLE_MONGO_TESTS env variable is not set")
-	}
+	t.Helper()
 
-	db, err := datastore.New("mongodb://localhost:27017/", "test_ureadability", 0)
-	require.NoError(t, err)
-
-	stores := db.GetStores()
 	srv := Server{
 		Readability: extractor.UReadability{
 			TimeOut:     30 * time.Second,
 			SnippetSize: 300,
-			Rules:       stores.Rules,
+			Rules:       newRulesStoreMock(),
 		},
 		Credentials: map[string]string{"admin": "password"},
 		Version:     "dev-test",
@@ -633,6 +628,84 @@ func startupT(t *testing.T) (*httptest.Server, *Server) {
 	srv.rulePage = template.Must(template.Must(templates.Clone()).ParseFiles(filepath.Join(webDir, "rule.gohtml")))
 
 	return httptest.NewServer(srv.routes(webDir)), &srv
+}
+
+// newRulesStoreMock creates a moq-generated RulesMock with in-memory CRUD behavior
+func newRulesStoreMock() *mocks.RulesMock {
+	var mu sync.Mutex
+	var rules []datastore.Rule
+
+	return &mocks.RulesMock{
+		GetFunc: func(_ context.Context, rURL string) (datastore.Rule, bool) {
+			mu.Lock()
+			defer mu.Unlock()
+			u, err := url.Parse(rURL)
+			if err != nil {
+				return datastore.Rule{}, false
+			}
+			for _, r := range rules {
+				if r.Domain == u.Host && r.Enabled {
+					return r, true
+				}
+			}
+			return datastore.Rule{}, false
+		},
+		GetByIDFunc: func(_ context.Context, id primitive.ObjectID) (datastore.Rule, bool) {
+			mu.Lock()
+			defer mu.Unlock()
+			for _, r := range rules {
+				if r.ID == id {
+					return r, true
+				}
+			}
+			return datastore.Rule{}, false
+		},
+		SaveFunc: func(_ context.Context, rule datastore.Rule) (datastore.Rule, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			// upsert by domain
+			for i, r := range rules {
+				if r.Domain == rule.Domain {
+					if rule.ID != primitive.NilObjectID && rule.ID != r.ID {
+						return rule, fmt.Errorf("the (immutable) field '_id' was found to have been altered")
+					}
+					rule.ID = r.ID
+					rules[i] = rule
+					return rule, nil
+				}
+			}
+			// insert new, check for duplicate _id
+			if rule.ID != primitive.NilObjectID {
+				for _, r := range rules {
+					if r.ID == rule.ID {
+						return rule, fmt.Errorf("E11000 duplicate key error")
+					}
+				}
+			} else {
+				rule.ID = primitive.NewObjectID()
+			}
+			rules = append(rules, rule)
+			return rule, nil
+		},
+		DisableFunc: func(_ context.Context, id primitive.ObjectID) error {
+			mu.Lock()
+			defer mu.Unlock()
+			for i, r := range rules {
+				if r.ID == id {
+					rules[i].Enabled = false
+					return nil
+				}
+			}
+			return fmt.Errorf("rule not found")
+		},
+		AllFunc: func(_ context.Context) []datastore.Rule {
+			mu.Lock()
+			defer mu.Unlock()
+			result := make([]datastore.Rule, len(rules))
+			copy(result, rules)
+			return result
+		},
+	}
 }
 
 // thanks to https://stackoverflow.com/a/31832326/961092

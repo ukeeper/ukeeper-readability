@@ -1,32 +1,54 @@
 package datastore
 
 import (
-	"os"
+	"context"
 	"testing"
 	"time"
 
+	"github.com/go-pkgz/testutils/containers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestMongoCreation(t *testing.T) {
-	if _, ok := os.LookupEnv("ENABLE_MONGO_TESTS"); !ok {
-		t.Skip("ENABLE_MONGO_TESTS env variable is not set")
-	}
-	// wrong credentials, so that GetStores will fail with warning
-	server, err := New("mongodb://wrong:wrong@localhost:27017/", "test_ureadability", 0)
-	require.NoError(t, err)
-	assert.NotNil(t, server)
-	assert.NotNil(t, server.client)
-	assert.Equal(t, "test_ureadability", server.dbName)
-	assert.NotNil(t, server.GetStores())
+func TestNew(t *testing.T) {
+	mc := containers.NewMongoTestContainer(context.Background(), t, 5)
+	defer mc.Close(context.Background()) //nolint:errcheck
+
+	t.Run("valid connection", func(t *testing.T) {
+		server, err := New(mc.URI, "test_ureadability", 0)
+		require.NoError(t, err)
+		assert.NotNil(t, server)
+		assert.NotNil(t, server.client)
+		assert.Equal(t, "test_ureadability", server.dbName)
+	})
+
+	t.Run("with delay", func(t *testing.T) {
+		server, err := New(mc.URI, "test_ureadability", 10*time.Millisecond)
+		require.NoError(t, err)
+		assert.NotNil(t, server)
+	})
+
+	t.Run("wrong connection string", func(t *testing.T) {
+		server, err := New("wrong", "test_ureadability", 0)
+		require.Error(t, err)
+		assert.Nil(t, server)
+	})
+
+	t.Run("empty connection string", func(t *testing.T) {
+		server, err := New("", "", 0)
+		require.Error(t, err)
+		assert.Nil(t, server)
+	})
 }
 
-func TestWrongConnectionString(t *testing.T) {
-	server, err := New("wrong", "test_ureadability", time.Millisecond*100)
-	require.Error(t, err)
-	assert.Nil(t, server)
-	server, err = New("", "", time.Millisecond*100)
-	require.Error(t, err)
-	assert.Nil(t, server)
+func TestGetStores(t *testing.T) {
+	mc := containers.NewMongoTestContainer(context.Background(), t, 5)
+	defer mc.Close(context.Background()) //nolint:errcheck
+
+	server, err := New(mc.URI, "test_ureadability", 0)
+	require.NoError(t, err)
+
+	stores := server.GetStores()
+	assert.NotNil(t, stores.Rules)
+	assert.NotNil(t, stores.Rules.Collection)
 }

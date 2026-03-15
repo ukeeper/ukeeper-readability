@@ -13,9 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/ukeeper/ukeeper-readability/backend/datastore"
+	"github.com/ukeeper/ukeeper-readability/backend/extractor/mocks"
 )
 
 func TestExtractURL(t *testing.T) {
@@ -166,22 +166,54 @@ func TestNormalizeLinksIssue(t *testing.T) {
 	require.NoError(t, err)
 }
 
-type RulesMock struct{}
+func TestExtractByRule(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
+			fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")
+			testHTML, err := io.ReadAll(fh)
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
+			_, err = w.Write(testHTML)
+			assert.NoError(t, err)
+			return
+		}
+	}))
+	defer ts.Close()
 
-func (m RulesMock) Get(_ context.Context, _ string) (datastore.Rule, bool) {
-	return datastore.Rule{Content: "#content p, .post-title"}, true
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
+
+	t.Run("with custom rule", func(t *testing.T) {
+		rule := &datastore.Rule{Content: ".content p", Enabled: true}
+		res, err := lr.ExtractByRule(context.Background(), ts.URL+"/2015/09/25/poiezdka-s-apple-maps/", rule)
+		require.NoError(t, err)
+		assert.NotEmpty(t, res.Content)
+		assert.NotEmpty(t, res.Rich)
+		assert.NotEmpty(t, res.Title)
+		assert.Contains(t, res.URL, "/2015/09/25/poiezdka-s-apple-maps/")
+	})
+
+	t.Run("without rule falls back to general parser", func(t *testing.T) {
+		res, err := lr.ExtractByRule(context.Background(), ts.URL+"/2015/09/25/poiezdka-s-apple-maps/", nil)
+		require.NoError(t, err)
+		assert.NotEmpty(t, res.Content)
+		assert.NotEmpty(t, res.Title)
+	})
+
+	t.Run("bad url", func(t *testing.T) {
+		rule := &datastore.Rule{Content: "article", Enabled: true}
+		res, err := lr.ExtractByRule(context.Background(), "http://bad_url", rule)
+		require.Error(t, err)
+		assert.Nil(t, res)
+	})
 }
-func (m RulesMock) GetByID(_ context.Context, _ primitive.ObjectID) (datastore.Rule, bool) {
-	return datastore.Rule{}, false
-}
-func (m RulesMock) Save(_ context.Context, _ datastore.Rule) (datastore.Rule, error) {
-	return datastore.Rule{}, nil
-}
-func (m RulesMock) Disable(_ context.Context, _ primitive.ObjectID) error { return nil }
-func (m RulesMock) All(_ context.Context) []datastore.Rule                { return make([]datastore.Rule, 0) }
 
 func TestGetContentCustom(t *testing.T) {
-	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200, Rules: RulesMock{}}
+	rulesMock := &mocks.RulesMock{
+		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
+			return datastore.Rule{Content: "#content p, .post-title"}, true
+		},
+	}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200, Rules: rulesMock}
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
