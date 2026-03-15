@@ -4,16 +4,16 @@ go 1.25.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/go-pkgz/lgr v0.12.1
-	github.com/go-pkgz/rest v1.20.6
+	github.com/go-pkgz/lgr v0.12.2
+	github.com/go-pkgz/rest v1.21.0
 	github.com/go-pkgz/routegroup v1.6.0
 	github.com/go-pkgz/testutils v0.5.0
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
 	github.com/stretchr/testify v1.11.1
-	go.mongodb.org/mongo-driver v1.17.6
-	golang.org/x/net v0.49.0
+	go.mongodb.org/mongo-driver v1.17.9
+	golang.org/x/net v0.52.0
 )
 
 require (
@@ -98,10 +98,10 @@ require (
 	go.opentelemetry.io/otel/sdk v1.39.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260311181403-84a4fc48630c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260311181403-84a4fc48630c // indirect
 	google.golang.org/grpc v1.79.1 // indirect
