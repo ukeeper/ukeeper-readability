@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/ukeeper/ukeeper-readability/datastore"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // RulesMock is a mock implementation of extractor.Rules.
@@ -20,13 +20,13 @@ import (
 //			AllFunc: func(ctx context.Context) []datastore.Rule {
 //				panic("mock out the All method")
 //			},
-//			DisableFunc: func(ctx context.Context, id primitive.ObjectID) error {
+//			DisableFunc: func(ctx context.Context, id bson.ObjectID) error {
 //				panic("mock out the Disable method")
 //			},
 //			GetFunc: func(ctx context.Context, rURL string) (datastore.Rule, bool) {
 //				panic("mock out the Get method")
 //			},
-//			GetByIDFunc: func(ctx context.Context, id primitive.ObjectID) (datastore.Rule, bool) {
+//			GetByIDFunc: func(ctx context.Context, id bson.ObjectID) (datastore.Rule, bool) {
 //				panic("mock out the GetByID method")
 //			},
 //			SaveFunc: func(ctx context.Context, rule datastore.Rule) (datastore.Rule, error) {
@@ -43,13 +43,13 @@ type RulesMock struct {
 	AllFunc func(ctx context.Context) []datastore.Rule
 
 	// DisableFunc mocks the Disable method.
-	DisableFunc func(ctx context.Context, id primitive.ObjectID) error
+	DisableFunc func(ctx context.Context, id bson.ObjectID) error
 
 	// GetFunc mocks the Get method.
 	GetFunc func(ctx context.Context, rURL string) (datastore.Rule, bool)
 
 	// GetByIDFunc mocks the GetByID method.
-	GetByIDFunc func(ctx context.Context, id primitive.ObjectID) (datastore.Rule, bool)
+	GetByIDFunc func(ctx context.Context, id bson.ObjectID) (datastore.Rule, bool)
 
 	// SaveFunc mocks the Save method.
 	SaveFunc func(ctx context.Context, rule datastore.Rule) (datastore.Rule, error)
@@ -66,7 +66,7 @@ type RulesMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// ID is the id argument value.
-			ID primitive.ObjectID
+			ID bson.ObjectID
 		}
 		// Get holds details about calls to the Get method.
 		Get []struct {
@@ -80,7 +80,7 @@ type RulesMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// ID is the id argument value.
-			ID primitive.ObjectID
+			ID bson.ObjectID
 		}
 		// Save holds details about calls to the Save method.
 		Save []struct {
@@ -130,13 +130,13 @@ func (mock *RulesMock) AllCalls() []struct {
 }
 
 // Disable calls DisableFunc.
-func (mock *RulesMock) Disable(ctx context.Context, id primitive.ObjectID) error {
+func (mock *RulesMock) Disable(ctx context.Context, id bson.ObjectID) error {
 	if mock.DisableFunc == nil {
 		panic("RulesMock.DisableFunc: method is nil but Rules.Disable was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
-		ID  primitive.ObjectID
+		ID  bson.ObjectID
 	}{
 		Ctx: ctx,
 		ID:  id,
@@ -153,11 +153,11 @@ func (mock *RulesMock) Disable(ctx context.Context, id primitive.ObjectID) error
 //	len(mockedRules.DisableCalls())
 func (mock *RulesMock) DisableCalls() []struct {
 	Ctx context.Context
-	ID  primitive.ObjectID
+	ID  bson.ObjectID
 } {
 	var calls []struct {
 		Ctx context.Context
-		ID  primitive.ObjectID
+		ID  bson.ObjectID
 	}
 	mock.lockDisable.RLock()
 	calls = mock.calls.Disable
@@ -202,13 +202,13 @@ func (mock *RulesMock) GetCalls() []struct {
 }
 
 // GetByID calls GetByIDFunc.
-func (mock *RulesMock) GetByID(ctx context.Context, id primitive.ObjectID) (datastore.Rule, bool) {
+func (mock *RulesMock) GetByID(ctx context.Context, id bson.ObjectID) (datastore.Rule, bool) {
 	if mock.GetByIDFunc == nil {
 		panic("RulesMock.GetByIDFunc: method is nil but Rules.GetByID was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
-		ID  primitive.ObjectID
+		ID  bson.ObjectID
 	}{
 		Ctx: ctx,
 		ID:  id,
@@ -225,11 +225,11 @@ func (mock *RulesMock) GetByID(ctx context.Context, id primitive.ObjectID) (data
 //	len(mockedRules.GetByIDCalls())
 func (mock *RulesMock) GetByIDCalls() []struct {
 	Ctx context.Context
-	ID  primitive.ObjectID
+	ID  bson.ObjectID
 } {
 	var calls []struct {
 		Ctx context.Context
-		ID  primitive.ObjectID
+		ID  bson.ObjectID
 	}
 	mock.lockGetByID.RLock()
 	calls = mock.calls.GetByID

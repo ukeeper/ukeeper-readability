@@ -7,9 +7,9 @@ import (
 	"time"
 
 	log "github.com/go-pkgz/lgr"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // MongoServer top level mongo ops
@@ -29,7 +29,7 @@ func New(connectionURI, dbName string, delay time.Duration) (*MongoServer, error
 		return nil, errors.New("env MONGO_URI not defined and --mongo not passed")
 	}
 
-	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(connectionURI))
+	client, err := mongo.Connect(options.Client().ApplyURI(connectionURI))
 	if err != nil {
 		return nil, err
 	}

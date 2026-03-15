@@ -8,7 +8,7 @@ import (
 	"github.com/go-pkgz/testutils/containers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"
@@ -23,7 +23,7 @@ func TestRulesSave(t *testing.T) {
 		assert.Equal(t, rule.Domain, saved.Domain)
 		assert.Equal(t, rule.Content, saved.Content)
 		assert.True(t, saved.Enabled)
-		assert.NotEqual(t, primitive.NilObjectID, saved.ID)
+		assert.NotEqual(t, bson.NilObjectID, saved.ID)
 	})
 
 	t.Run("upsert same domain preserves id", func(t *testing.T) {
@@ -130,12 +130,12 @@ func TestRulesGetByID(t *testing.T) {
 	})
 
 	t.Run("non-existing id", func(t *testing.T) {
-		_, ok := rules.GetByID(context.Background(), primitive.NewObjectID())
+		_, ok := rules.GetByID(context.Background(), bson.NewObjectID())
 		assert.False(t, ok)
 	})
 
 	t.Run("nil object id", func(t *testing.T) {
-		_, ok := rules.GetByID(context.Background(), primitive.NilObjectID)
+		_, ok := rules.GetByID(context.Background(), bson.NilObjectID)
 		assert.False(t, ok)
 	})
 }
@@ -158,7 +158,7 @@ func TestRulesDisable(t *testing.T) {
 	})
 
 	t.Run("disable non-existing id does not error", func(t *testing.T) {
-		err := rules.Disable(context.Background(), primitive.NewObjectID())
+		err := rules.Disable(context.Background(), bson.NewObjectID())
 		require.NoError(t, err) // mongo UpdateOne with no match is not an error
 	})
 }
@@ -204,7 +204,7 @@ func TestRulesAll(t *testing.T) {
 
 func TestRuleString(t *testing.T) {
 	rule := Rule{
-		ID:      primitive.NewObjectID(),
+		ID:      bson.NewObjectID(),
 		Domain:  "example.com",
 		Content: ".article",
 		Enabled: true,

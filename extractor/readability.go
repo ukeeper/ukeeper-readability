@@ -14,7 +14,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/go-pkgz/lgr"
 	"github.com/mauidude/go-readability"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/ukeeper/ukeeper-readability/datastore"
 )
@@ -24,9 +24,9 @@ import (
 // Rules interface with all methods to access datastore
 type Rules interface {
 	Get(ctx context.Context, rURL string) (datastore.Rule, bool)
-	GetByID(ctx context.Context, id primitive.ObjectID) (datastore.Rule, bool)
+	GetByID(ctx context.Context, id bson.ObjectID) (datastore.Rule, bool)
 	Save(ctx context.Context, rule datastore.Rule) (datastore.Rule, error)
-	Disable(ctx context.Context, id primitive.ObjectID) error
+	Disable(ctx context.Context, id bson.ObjectID) error
 	All(ctx context.Context) []datastore.Rule
 }
 

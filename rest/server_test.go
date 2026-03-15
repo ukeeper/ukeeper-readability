@@ -20,7 +20,7 @@ import (
 	"github.com/go-pkgz/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/ukeeper/ukeeper-readability/datastore"
 	"github.com/ukeeper/ukeeper-readability/extractor"
@@ -650,7 +650,7 @@ func newRulesStoreMock() *mocks.RulesMock {
 			}
 			return datastore.Rule{}, false
 		},
-		GetByIDFunc: func(_ context.Context, id primitive.ObjectID) (datastore.Rule, bool) {
+		GetByIDFunc: func(_ context.Context, id bson.ObjectID) (datastore.Rule, bool) {
 			mu.Lock()
 			defer mu.Unlock()
 			for _, r := range rules {
@@ -666,7 +666,7 @@ func newRulesStoreMock() *mocks.RulesMock {
 			// upsert by domain
 			for i, r := range rules {
 				if r.Domain == rule.Domain {
-					if rule.ID != primitive.NilObjectID && rule.ID != r.ID {
+					if rule.ID != bson.NilObjectID && rule.ID != r.ID {
 						return rule, fmt.Errorf("the (immutable) field '_id' was found to have been altered")
 					}
 					rule.ID = r.ID
@@ -675,19 +675,19 @@ func newRulesStoreMock() *mocks.RulesMock {
 				}
 			}
 			// insert new, check for duplicate _id
-			if rule.ID != primitive.NilObjectID {
+			if rule.ID != bson.NilObjectID {
 				for _, r := range rules {
 					if r.ID == rule.ID {
 						return rule, fmt.Errorf("E11000 duplicate key error")
 					}
 				}
 			} else {
-				rule.ID = primitive.NewObjectID()
+				rule.ID = bson.NewObjectID()
 			}
 			rules = append(rules, rule)
 			return rule, nil
 		},
-		DisableFunc: func(_ context.Context, id primitive.ObjectID) error {
+		DisableFunc: func(_ context.Context, id bson.ObjectID) error {
 			mu.Lock()
 			defer mu.Unlock()
 			for i, r := range rules {

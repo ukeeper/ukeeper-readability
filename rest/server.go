@@ -16,7 +16,7 @@ import (
 	"github.com/go-pkgz/rest"
 	"github.com/go-pkgz/rest/logger"
 	"github.com/go-pkgz/routegroup"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/ukeeper/ukeeper-readability/datastore"
 	"github.com/ukeeper/ukeeper-readability/extractor"
@@ -345,10 +345,10 @@ func (s *Server) authFake(w http.ResponseWriter, _ *http.Request) {
 	rest.RenderJSON(w, JSON{"pong": t.Format("20060102150405")})
 }
 
-func getBid(id string) primitive.ObjectID {
-	bid, err := primitive.ObjectIDFromHex(id)
+func getBid(id string) bson.ObjectID {
+	bid, err := bson.ObjectIDFromHex(id)
 	if err != nil {
-		return primitive.NilObjectID
+		return bson.NilObjectID
 	}
 	return bid
 }

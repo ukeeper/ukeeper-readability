@@ -13,6 +13,7 @@ require (
 	github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
 	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.9
+	go.mongodb.org/mongo-driver/v2 v2.5.0
 	golang.org/x/net v0.52.0
 )
 
