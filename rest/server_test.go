@@ -22,9 +22,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/ukeeper/ukeeper-readability/backend/datastore"
-	"github.com/ukeeper/ukeeper-readability/backend/extractor"
-	"github.com/ukeeper/ukeeper-readability/backend/extractor/mocks"
+	"github.com/ukeeper/ukeeper-readability/datastore"
+	"github.com/ukeeper/ukeeper-readability/extractor"
+	"github.com/ukeeper/ukeeper-readability/extractor/mocks"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"

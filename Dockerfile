@@ -5,17 +5,9 @@ ARG CI
 ARG GITHUB_REF
 ARG GITHUB_SHA
 ARG GIT_BRANCH
-ARG SKIP_TEST
 
 ADD . /build
-WORKDIR /build/backend
-
-# run tests and linters
-RUN \
-    if [ -z "$SKIP_TEST" ] ; then \
-        go test -timeout=30s  ./... && \
-        golangci-lint run ; \
-    else echo "skip tests and linter" ; fi
+WORKDIR /build
 
 RUN \
     version="$(/script/version.sh)" && \
@@ -31,8 +23,8 @@ LABEL org.opencontainers.image.source="https://github.com/ukeeper/ukeeper-readab
 
 RUN apk add --update ca-certificates && update-ca-certificates
 
-COPY --from=build-backend /build/backend/ukeeper-readability /srv/
-ADD ./backend/web /srv/web
+COPY --from=build-backend /build/ukeeper-readability /srv/
+ADD ./web /srv/web
 
 RUN chown -R app:app /srv
 USER app

@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ukeeper/ukeeper-readability/backend/datastore"
+	"github.com/ukeeper/ukeeper-readability/datastore"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

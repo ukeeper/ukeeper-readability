@@ -16,7 +16,7 @@ import (
 	"github.com/mauidude/go-readability"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/ukeeper/ukeeper-readability/backend/datastore"
+	"github.com/ukeeper/ukeeper-readability/datastore"
 )
 
 //go:generate moq -out mocks/rules.go -pkg mocks -skip-ensure -fmt goimports . Rules

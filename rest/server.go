@@ -18,8 +18,8 @@ import (
 	"github.com/go-pkgz/routegroup"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/ukeeper/ukeeper-readability/backend/datastore"
-	"github.com/ukeeper/ukeeper-readability/backend/extractor"
+	"github.com/ukeeper/ukeeper-readability/datastore"
+	"github.com/ukeeper/ukeeper-readability/extractor"
 )
 
 // Server is a basic rest server providing access to store and invoking parser

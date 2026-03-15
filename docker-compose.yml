@@ -41,20 +41,3 @@ services:
     volumes:
       - /tmp/mongodb:/data/db
 
-# uncomment the lines below to have mongodb ready for tests,
-# then start them by running
-# `ENABLE_MONGO_TESTS=true go test ./...`
-#  mongo-tests:
-#    image: mongo:5.0
-#    logging:
-#      driver: json-file
-#      options:
-#        max-size: "20m"
-#        max-file: "5"
-#    hostname: mongo-tests
-#    restart: always
-#    container_name: ureadability-mongo-tests
-#    ports:
-#      - "27017:27017"
-#    environment:
-#      - MONGO_INITDB_DATABASE=admin

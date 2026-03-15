@@ -11,9 +11,9 @@ import (
 	log "github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
 
-	"github.com/ukeeper/ukeeper-readability/backend/datastore"
-	"github.com/ukeeper/ukeeper-readability/backend/extractor"
-	"github.com/ukeeper/ukeeper-readability/backend/rest"
+	"github.com/ukeeper/ukeeper-readability/datastore"
+	"github.com/ukeeper/ukeeper-readability/extractor"
+	"github.com/ukeeper/ukeeper-readability/rest"
 )
 
 var revision string

@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ukeeper/ukeeper-readability/backend/datastore"
-	"github.com/ukeeper/ukeeper-readability/backend/extractor/mocks"
+	"github.com/ukeeper/ukeeper-readability/datastore"
+	"github.com/ukeeper/ukeeper-readability/extractor/mocks"
 )
 
 func TestExtractURL(t *testing.T) {
