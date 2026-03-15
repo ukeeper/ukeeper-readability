@@ -12,7 +12,6 @@ require (
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
 	github.com/stretchr/testify v1.11.1
-	go.mongodb.org/mongo-driver v1.17.9
 	go.mongodb.org/mongo-driver/v2 v2.5.0
 	golang.org/x/net v0.52.0
 )
@@ -92,6 +91,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	go.mongodb.org/mongo-driver v1.17.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
 	go.opentelemetry.io/otel v1.39.0 // indirect
