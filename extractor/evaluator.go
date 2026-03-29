@@ -60,20 +60,24 @@ func (e *OpenAIEvaluator) getClient() *openai.Client {
 // Evaluate sends the extracted text and HTML body to OpenAI for evaluation.
 // Returns EvalResult indicating whether extraction is good, or suggests a CSS selector.
 func (e *OpenAIEvaluator) Evaluate(ctx context.Context, reqURL, extractedText, htmlBody, prevSelector string) (*EvalResult, error) {
-	callCtx, cancel := context.WithTimeout(ctx, openaiCallTimeout)
-	defer cancel()
-
 	client := e.getClient()
 	userPrompt := buildUserPrompt(reqURL, extractedText, htmlBody, prevSelector)
+
+	callCtx, cancel := context.WithTimeout(ctx, openaiCallTimeout)
+	defer cancel()
 
 	result, err := e.callAPI(callCtx, client, userPrompt)
 	if err != nil {
 		if !errors.Is(err, errInvalidJSON) {
 			return nil, err
 		}
-		// retry once on invalid JSON
+		cancel() // release the first context before creating a new one
+
+		// retry once on invalid JSON with a fresh timeout
 		log.Printf("[WARN] invalid JSON from OpenAI for %s, retrying once", reqURL)
-		result, err = e.callAPI(callCtx, client, userPrompt)
+		retryCtx, retryCancel := context.WithTimeout(ctx, openaiCallTimeout)
+		defer retryCancel()
+		result, err = e.callAPI(retryCtx, client, userPrompt)
 		if err != nil {
 			return nil, fmt.Errorf("openai retry for %s: %w", reqURL, err)
 		}
