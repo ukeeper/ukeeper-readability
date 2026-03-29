@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -34,14 +35,20 @@ type UReadability struct {
 	SnippetSize int
 	Rules       Rules
 	Retriever   Retriever
+
+	defaultRetrieverOnce sync.Once
+	defaultRetriever     Retriever
 }
 
-// retriever returns the configured Retriever, defaulting to HTTPRetriever if nil
+// retriever returns the configured Retriever, defaulting to a cached HTTPRetriever if nil
 func (f *UReadability) retriever() Retriever {
 	if f.Retriever != nil {
 		return f.Retriever
 	}
-	return &HTTPRetriever{Timeout: f.TimeOut}
+	f.defaultRetrieverOnce.Do(func() {
+		f.defaultRetriever = &HTTPRetriever{Timeout: f.TimeOut}
+	})
+	return f.defaultRetriever
 }
 
 // Response from api calls

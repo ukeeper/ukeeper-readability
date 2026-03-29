@@ -35,9 +35,15 @@ type HTTPRetriever struct {
 	client *http.Client
 }
 
+const httpDefaultTimeout = 30 * time.Second
+
 func (h *HTTPRetriever) httpClient() *http.Client {
 	h.once.Do(func() {
-		h.client = &http.Client{Timeout: h.Timeout}
+		timeout := h.Timeout
+		if timeout == 0 {
+			timeout = httpDefaultTimeout
+		}
+		h.client = &http.Client{Timeout: timeout}
 	})
 	return h.client
 }
@@ -74,13 +80,19 @@ func (h *HTTPRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveR
 	}, nil
 }
 
+const (
+	cfDefaultBaseURL   = "https://api.cloudflare.com/client/v4"
+	cfDefaultWaitUntil = "networkidle0"
+	cfDefaultTimeout   = 60 * time.Second
+)
+
 // CloudflareRetriever fetches pages using Cloudflare Browser Rendering API.
 // it sends a POST to the /content endpoint which returns fully rendered HTML after JS execution.
 type CloudflareRetriever struct {
 	AccountID string
 	APIToken  string
-	BaseURL   string // override for testing; defaults to Cloudflare API
-	Timeout   time.Duration
+	BaseURL   string        // override for testing; defaults to Cloudflare API
+	Timeout   time.Duration // defaults to 60s (browser rendering can be slow)
 
 	once   sync.Once
 	client *http.Client
@@ -88,23 +100,24 @@ type CloudflareRetriever struct {
 
 func (c *CloudflareRetriever) httpClient() *http.Client {
 	c.once.Do(func() {
-		c.client = &http.Client{Timeout: c.Timeout}
+		timeout := c.Timeout
+		if timeout == 0 {
+			timeout = cfDefaultTimeout
+		}
+		c.client = &http.Client{Timeout: timeout}
 	})
 	return c.client
 }
 
-// cfRequest is the request body for the Cloudflare Browser Rendering /content endpoint
 type cfRequest struct {
 	URL         string        `json:"url"`
 	GotoOptions cfGotoOptions `json:"gotoOptions"`
 }
 
-// cfGotoOptions configures page navigation for Cloudflare Browser Rendering
 type cfGotoOptions struct {
 	WaitUntil string `json:"waitUntil"`
 }
 
-// cfResponse is the JSON response from the Cloudflare Browser Rendering /content endpoint
 type cfResponse struct {
 	Success bool   `json:"success"`
 	Result  string `json:"result"`
@@ -114,13 +127,13 @@ type cfResponse struct {
 func (c *CloudflareRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveResult, error) {
 	baseURL := c.BaseURL
 	if baseURL == "" {
-		baseURL = "https://api.cloudflare.com/client/v4"
+		baseURL = cfDefaultBaseURL
 	}
 	endpoint := fmt.Sprintf("%s/accounts/%s/browser-rendering/content", baseURL, c.AccountID)
 
 	cfReq := cfRequest{
 		URL:         reqURL,
-		GotoOptions: cfGotoOptions{WaitUntil: "networkidle0"},
+		GotoOptions: cfGotoOptions{WaitUntil: cfDefaultWaitUntil},
 	}
 	reqBody, err := json.Marshal(cfReq)
 	if err != nil {
