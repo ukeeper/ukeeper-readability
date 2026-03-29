@@ -23,6 +23,18 @@
 | openai-max-iter | OPENAI_MAX_ITER | `3`         | max evaluation iterations per extraction               |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
 
+#### OpenAI integration
+
+| Command line                  | Environment                | Default       | Description                                                      |
+|-------------------------------|----------------------------|---------------|------------------------------------------------------------------|
+| openai.api-key                | OPENAI_API_KEY             | none          | OpenAI API key for summary generation                            |
+| openai.model-type             | OPENAI_MODEL_TYPE          | `gpt-4o-mini` | OpenAI model name (e.g., gpt-4o, gpt-4o-mini)                   |
+| openai.disable-summaries      | OPENAI_DISABLE_SUMMARIES   | `false`       | disable summary generation                                       |
+| openai.summary-prompt         | OPENAI_SUMMARY_PROMPT      | built-in      | custom prompt for summary generation                             |
+| openai.max-content-length     | OPENAI_MAX_CONTENT_LENGTH  | `10000`       | maximum content length to send to OpenAI API (0 for no limit)    |
+| openai.requests-per-minute    | OPENAI_REQUESTS_PER_MINUTE | `10`          | maximum OpenAI API requests per minute (0 for no limit)          |
+| openai.cleanup-interval       | OPENAI_CLEANUP_INTERVAL    | `24h`         | interval for cleaning up expired cached summaries                |
+
 ### Cloudflare Browser Rendering (optional)
 
 When both `--cf-account-id` and `--cf-api-token` are set, the service uses Cloudflare Browser Rendering API to fetch page content instead of direct HTTP. This renders JavaScript and handles bot-protection pages that return empty or "just a moment..." responses to standard HTTP requests.
@@ -44,8 +56,12 @@ When OpenAI is not configured, extraction works exactly as before — no GPT cal
 ### API
 
     GET /api/content/v1/parser?token=secret&url=http://aa.com/blah - extract content (emulate Readability API parse call)
+    GET /api/content/v1/parser?token=secret&url=http://aa.com/blah&summary=true - extract content with AI-generated summary
     POST /api/extract {url: http://aa.com/blah}  - extract content
+    GET /api/metrics - summary generation metrics (cache hits, misses, response times)
     POST /api/content-parsed-wrong?url=http://aa.com/blah - force re-extraction with AI evaluation (requires basicAuth)
+
+Summary generation requires a valid token and an OpenAI API key. Summaries are cached in MongoDB with a 1-month expiration. Expired summaries are cleaned up automatically on the configured interval.
 
 ## Development
 
