@@ -46,15 +46,15 @@
 - Create: `extractor/evaluator_test.go`
 - Create: `extractor/mocks/evaluator.go` (generated)
 
-- [ ] run `go get github.com/sashabaranov/go-openai@latest && go mod tidy && go mod vendor`
-- [ ] define `AIEvaluator` interface with `Evaluate(ctx, url, extractedText, htmlBody string) (*EvalResult, error)` method
-- [ ] define `EvalResult` struct: `Good bool`, `Selector string`
-- [ ] implement `OpenAIEvaluator` struct with `APIKey`, `Model` fields
-- [ ] implement `Evaluate` method: build prompt with URL + extracted text (first 2000 chars) + truncated HTML body (first 4000 chars), parse JSON response `{"good": true}` or `{"good": false, "selector": "..."}`
-- [ ] handle invalid JSON response: retry once, then return `EvalResult{Good: true}` (fail open)
-- [ ] add `//go:generate moq` directive for `AIEvaluator`, run `go generate` to create mock
-- [ ] write tests: successful good evaluation, successful bad evaluation with selector, invalid JSON response, OpenAI API error
-- [ ] run tests — must pass before next task
+- [x] run `go get github.com/sashabaranov/go-openai@latest && go mod tidy && go mod vendor`
+- [x] define `AIEvaluator` interface with `Evaluate(ctx, url, extractedText, htmlBody string) (*EvalResult, error)` method
+- [x] define `EvalResult` struct: `Good bool`, `Selector string`
+- [x] implement `OpenAIEvaluator` struct with `APIKey`, `Model` fields
+- [x] implement `Evaluate` method: build prompt with URL + extracted text (first 2000 chars) + truncated HTML body (first 4000 chars), parse JSON response `{"good": true}` or `{"good": false, "selector": "..."}`
+- [x] handle invalid JSON response: retry once, then return `EvalResult{Good: true}` (fail open)
+- [x] add `//go:generate moq` directive for `AIEvaluator`, run `go generate` to create mock
+- [x] write tests: successful good evaluation, successful bad evaluation with selector, invalid JSON response, OpenAI API error
+- [x] run tests — must pass before next task
 
 ### Task 2: Wire AIEvaluator into UReadability and add evaluation loop
 
