@@ -19,6 +19,9 @@
 | cf-account-id| CF_ACCOUNT_ID   | none           | Cloudflare account ID for Browser Rendering API       |
 | cf-api-token | CF_API_TOKEN    | none           | Cloudflare API token with Browser Rendering Edit perm |
 | cf-route-all | CF_ROUTE_ALL    | `false`        | route every request through Cloudflare Browser Rendering |
+| openai-api-key | OPENAI_API_KEY | none          | OpenAI API key; enables auto-evaluation when set      |
+| openai-model | OPENAI_MODEL    | `gpt-5.4-mini` | OpenAI model for evaluation                           |
+| openai-max-iter | OPENAI_MAX_ITER | `3`         | max evaluation iterations per extraction               |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
 
 ### Cloudflare Browser Rendering (optional)
@@ -29,6 +32,18 @@ Cloudflare Browser Rendering is useful for JavaScript-heavy pages and sites behi
 2. Either flip the `use_cloudflare` checkbox on individual rules (per-domain, recommended) or set `--cf-route-all=true` to route every request through Cloudflare.
 
 When Cloudflare credentials are not set, the service uses a standard HTTP client for everything (default). On HTTP 429 (rate limit) the service automatically retries with exponential backoff and respects the `Retry-After` header.
+
+### OpenAI Auto-Evaluation (optional)
+
+When `--openai-api-key` is set, the service automatically evaluates extraction quality using OpenAI. If the extracted content looks poor (missing article body, too short, mostly boilerplate), GPT suggests a CSS selector targeting the main content. The service iterates up to `--openai-max-iter` times, saving the best selector as a rule for future use.
+
+Evaluation only runs for domains without an existing extraction rule. For domains that already have rules, use the force-mode endpoint to re-evaluate:
+
+    GET /api/content-parsed-wrong?url=http://example.com/article
+
+This protected endpoint (requires basicAuth credentials) ignores the stored rule, re-extracts with the general parser, and runs the evaluation loop to find a better selector.
+
+When OpenAI is not configured, extraction works exactly as before — no GPT calls are made.
 
 ### API
 
