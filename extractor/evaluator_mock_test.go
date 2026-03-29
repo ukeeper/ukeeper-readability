@@ -14,7 +14,7 @@ import (
 //
 //		// make and configure a mocked AIEvaluator
 //		mockedAIEvaluator := &AIEvaluatorMock{
-//			EvaluateFunc: func(ctx context.Context, url string, extractedText string, htmlBody string) (*EvalResult, error) {
+//			EvaluateFunc: func(ctx context.Context, url string, extractedText string, htmlBody string, prevSelector string) (*EvalResult, error) {
 //				panic("mock out the Evaluate method")
 //			},
 //		}
@@ -25,7 +25,7 @@ import (
 //	}
 type AIEvaluatorMock struct {
 	// EvaluateFunc mocks the Evaluate method.
-	EvaluateFunc func(ctx context.Context, url string, extractedText string, htmlBody string) (*EvalResult, error)
+	EvaluateFunc func(ctx context.Context, url string, extractedText string, htmlBody string, prevSelector string) (*EvalResult, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -39,13 +39,15 @@ type AIEvaluatorMock struct {
 			ExtractedText string
 			// HtmlBody is the htmlBody argument value.
 			HtmlBody string
+			// PrevSelector is the prevSelector argument value.
+			PrevSelector string
 		}
 	}
 	lockEvaluate sync.RWMutex
 }
 
 // Evaluate calls EvaluateFunc.
-func (mock *AIEvaluatorMock) Evaluate(ctx context.Context, url string, extractedText string, htmlBody string) (*EvalResult, error) {
+func (mock *AIEvaluatorMock) Evaluate(ctx context.Context, url string, extractedText string, htmlBody string, prevSelector string) (*EvalResult, error) {
 	if mock.EvaluateFunc == nil {
 		panic("AIEvaluatorMock.EvaluateFunc: method is nil but AIEvaluator.Evaluate was just called")
 	}
@@ -54,16 +56,18 @@ func (mock *AIEvaluatorMock) Evaluate(ctx context.Context, url string, extracted
 		URL           string
 		ExtractedText string
 		HtmlBody      string
+		PrevSelector  string
 	}{
 		Ctx:           ctx,
 		URL:           url,
 		ExtractedText: extractedText,
 		HtmlBody:      htmlBody,
+		PrevSelector:  prevSelector,
 	}
 	mock.lockEvaluate.Lock()
 	mock.calls.Evaluate = append(mock.calls.Evaluate, callInfo)
 	mock.lockEvaluate.Unlock()
-	return mock.EvaluateFunc(ctx, url, extractedText, htmlBody)
+	return mock.EvaluateFunc(ctx, url, extractedText, htmlBody, prevSelector)
 }
 
 // EvaluateCalls gets all the calls that were made to Evaluate.
@@ -75,12 +79,14 @@ func (mock *AIEvaluatorMock) EvaluateCalls() []struct {
 	URL           string
 	ExtractedText string
 	HtmlBody      string
+	PrevSelector  string
 } {
 	var calls []struct {
 		Ctx           context.Context
 		URL           string
 		ExtractedText string
 		HtmlBody      string
+		PrevSelector  string
 	}
 	mock.lockEvaluate.RLock()
 	calls = mock.calls.Evaluate

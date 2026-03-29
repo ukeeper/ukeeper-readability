@@ -18,7 +18,7 @@ func TestParseEvalResponse(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		wantNil  bool
+		wantErr  bool
 		wantGood bool
 		wantSel  string
 	}{
@@ -33,11 +33,12 @@ func TestParseEvalResponse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := parseEvalResponse(tt.input)
-			require.NoError(t, err)
-			if tt.wantNil {
+			if tt.wantErr {
+				assert.ErrorIs(t, err, errInvalidJSON)
 				assert.Nil(t, result)
 				return
 			}
+			require.NoError(t, err)
 			require.NotNil(t, result)
 			assert.Equal(t, tt.wantGood, result.Good)
 			assert.Equal(t, tt.wantSel, result.Selector)
@@ -79,7 +80,7 @@ func TestOpenAIEvaluator_Evaluate(t *testing.T) {
 		defer ts.Close()
 
 		eval := newTestEvaluator(ts)
-		result, err := eval.Evaluate(context.Background(), "https://example.com", "article text", "<html/>")
+		result, err := eval.Evaluate(context.Background(), "https://example.com", "article text", "<html/>", "")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.True(t, result.Good)
@@ -91,16 +92,16 @@ func TestOpenAIEvaluator_Evaluate(t *testing.T) {
 		defer ts.Close()
 
 		eval := newTestEvaluator(ts)
-		result, err := eval.Evaluate(context.Background(), "https://example.com", "nav links", "<html/>")
+		result, err := eval.Evaluate(context.Background(), "https://example.com", "nav links", "<html/>", "")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		assert.False(t, result.Good)
 		assert.Equal(t, "article.main", result.Selector)
 	})
 
-	t.Run("invalid json response retries then fails open", func(t *testing.T) {
+	t.Run("invalid json response retries then fails", func(t *testing.T) {
 		callCount := 0
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			callCount++
 			resp := openai.ChatCompletionResponse{
 				Choices: []openai.ChatCompletionChoice{
@@ -113,10 +114,38 @@ func TestOpenAIEvaluator_Evaluate(t *testing.T) {
 		defer ts.Close()
 
 		eval := newTestEvaluator(ts)
-		result, err := eval.Evaluate(context.Background(), "https://example.com", "text", "<html/>")
+		result, err := eval.Evaluate(context.Background(), "https://example.com", "text", "<html/>", "")
+		assert.ErrorIs(t, err, errInvalidJSON)
+		assert.Nil(t, result)
+		assert.Equal(t, 2, callCount, "should have retried once")
+	})
+
+	t.Run("invalid json then valid on retry", func(t *testing.T) {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			callCount++
+			var content string
+			if callCount == 1 {
+				content = "not valid json"
+			} else {
+				content = `{"good": false, "selector": "div.main"}`
+			}
+			resp := openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{
+					{Message: openai.ChatCompletionMessage{Content: content}},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp) //nolint:errcheck
+		}))
+		defer ts.Close()
+
+		eval := newTestEvaluator(ts)
+		result, err := eval.Evaluate(context.Background(), "https://example.com", "text", "<html/>", "")
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		assert.True(t, result.Good, "should fail open with Good=true")
+		assert.False(t, result.Good)
+		assert.Equal(t, "div.main", result.Selector)
 		assert.Equal(t, 2, callCount, "should have retried once")
 	})
 
@@ -128,7 +157,7 @@ func TestOpenAIEvaluator_Evaluate(t *testing.T) {
 		defer ts.Close()
 
 		eval := newTestEvaluator(ts)
-		result, err := eval.Evaluate(context.Background(), "https://example.com", "text", "<html/>")
+		result, err := eval.Evaluate(context.Background(), "https://example.com", "text", "<html/>", "")
 		assert.Error(t, err)
 		assert.Nil(t, result)
 	})
@@ -142,7 +171,7 @@ func TestOpenAIEvaluator_Evaluate(t *testing.T) {
 		defer ts.Close()
 
 		eval := newTestEvaluator(ts)
-		result, err := eval.Evaluate(context.Background(), "https://example.com", "text", "<html/>")
+		result, err := eval.Evaluate(context.Background(), "https://example.com", "text", "<html/>", "")
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "no choices")

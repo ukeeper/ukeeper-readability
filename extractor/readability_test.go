@@ -358,7 +358,7 @@ func TestExtractWithEvaluatorGoodOnFirstTry(t *testing.T) {
 
 	evalCalls := 0
 	mockEvaluator := &AIEvaluatorMock{
-		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+		EvaluateFunc: func(_ context.Context, _, _, _, _ string) (*EvalResult, error) {
 			evalCalls++
 			return &EvalResult{Good: true}, nil
 		},
@@ -396,7 +396,7 @@ func TestExtractWithEvaluatorBadThenImproved(t *testing.T) {
 
 	evalCalls := 0
 	mockEvaluator := &AIEvaluatorMock{
-		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+		EvaluateFunc: func(_ context.Context, _, _, _, _ string) (*EvalResult, error) {
 			evalCalls++
 			if evalCalls == 1 {
 				return &EvalResult{Good: false, Selector: "div.article-body"}, nil
@@ -473,7 +473,7 @@ func TestExtractWithEvaluatorError(t *testing.T) {
 	}
 
 	mockEvaluator := &AIEvaluatorMock{
-		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+		EvaluateFunc: func(_ context.Context, _, _, _, _ string) (*EvalResult, error) {
 			return nil, fmt.Errorf("openai API error: connection refused")
 		},
 	}
@@ -505,7 +505,7 @@ func TestExtractSkipsEvaluationWhenRuleExists(t *testing.T) {
 
 	evalCalled := false
 	mockEvaluator := &AIEvaluatorMock{
-		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+		EvaluateFunc: func(_ context.Context, _, _, _, _ string) (*EvalResult, error) {
 			evalCalled = true
 			return &EvalResult{Good: true}, nil
 		},
@@ -549,7 +549,7 @@ func TestExtractAndImproveForceMode(t *testing.T) {
 
 	evalCalls := 0
 	mockEvaluator := &AIEvaluatorMock{
-		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+		EvaluateFunc: func(_ context.Context, _, _, _, _ string) (*EvalResult, error) {
 			evalCalls++
 			if evalCalls == 1 {
 				return &EvalResult{Good: false, Selector: "div.main-content"}, nil
@@ -602,7 +602,7 @@ func TestExtractWithEvaluatorBadSelectorNoMatch(t *testing.T) {
 
 	evalCalls := 0
 	mockEvaluator := &AIEvaluatorMock{
-		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+		EvaluateFunc: func(_ context.Context, _, _, _, _ string) (*EvalResult, error) {
 			evalCalls++
 			if evalCalls <= 2 {
 				return &EvalResult{Good: false, Selector: "div.nonexistent"}, nil
@@ -623,6 +623,53 @@ func TestExtractWithEvaluatorBadSelectorNoMatch(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, res.Content, "Original content from readability")
 	assert.Equal(t, 3, evalCalls, "should iterate all 3 times")
+}
+
+func TestExtractWithEvaluatorSaveFailure(t *testing.T) {
+	testHTML := `<html><head><title>Test</title></head>
+<body>
+<div class="article-body"><p>Real article content here.</p></div>
+</body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	evalCalls := 0
+	mockEvaluator := &AIEvaluatorMock{
+		EvaluateFunc: func(_ context.Context, _, _, _, _ string) (*EvalResult, error) {
+			evalCalls++
+			if evalCalls == 1 {
+				return &EvalResult{Good: false, Selector: "div.article-body"}, nil
+			}
+			return &EvalResult{Good: true}, nil
+		},
+	}
+
+	mockRules := &mocks.RulesMock{
+		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
+			return datastore.Rule{}, false
+		},
+		SaveFunc: func(_ context.Context, _ datastore.Rule) (datastore.Rule, error) {
+			return datastore.Rule{}, fmt.Errorf("mongo connection refused")
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		AIEvaluator: mockEvaluator,
+		Rules:       mockRules,
+	}
+
+	res, err := lr.Extract(context.Background(), "https://example.com/article")
+	require.NoError(t, err, "save failure should not propagate")
+	assert.Contains(t, res.Content, "Real article content")
 }
 
 func TestGetContentCustom(t *testing.T) {
