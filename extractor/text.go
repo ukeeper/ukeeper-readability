@@ -41,10 +41,7 @@ func (f *UReadability) getText(content, title string) string {
 // get snippet from clean text content
 func (f *UReadability) getSnippet(cleanText string) string {
 	cleanText = strings.ReplaceAll(cleanText, "\n", " ")
-	size := len([]rune(cleanText))
-	if size > f.SnippetSize {
-		size = f.SnippetSize
-	}
+	size := min(len([]rune(cleanText)), f.SnippetSize)
 	snippet := []rune(cleanText)[:size]
 	// go back in snippet and found first space
 	for i := len(snippet) - 1; i >= 0; i-- {
