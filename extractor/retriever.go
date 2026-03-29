@@ -1,7 +1,10 @@
 package extractor
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -59,5 +62,94 @@ func (h *HTTPRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveR
 		Body:   body,
 		URL:    resp.Request.URL.String(),
 		Header: resp.Header,
+	}, nil
+}
+
+// CloudflareRetriever fetches pages using Cloudflare Browser Rendering API.
+// it sends a POST to the /content endpoint which returns fully rendered HTML after JS execution.
+type CloudflareRetriever struct {
+	AccountID string
+	APIToken  string
+	BaseURL   string // override for testing; defaults to Cloudflare API
+	Timeout   time.Duration
+}
+
+// cfRequest is the request body for the Cloudflare Browser Rendering /content endpoint
+type cfRequest struct {
+	URL         string        `json:"url"`
+	GotoOptions cfGotoOptions `json:"gotoOptions"`
+}
+
+// cfGotoOptions configures page navigation for Cloudflare Browser Rendering
+type cfGotoOptions struct {
+	WaitUntil string `json:"waitUntil"`
+}
+
+// cfResponse is the JSON response from the Cloudflare Browser Rendering /content endpoint
+type cfResponse struct {
+	Success bool   `json:"success"`
+	Result  string `json:"result"`
+}
+
+// Retrieve fetches the URL via Cloudflare Browser Rendering /content endpoint
+func (c *CloudflareRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveResult, error) {
+	baseURL := c.BaseURL
+	if baseURL == "" {
+		baseURL = "https://api.cloudflare.com/client/v4"
+	}
+	endpoint := fmt.Sprintf("%s/accounts/%s/browser-rendering/content", baseURL, c.AccountID)
+
+	cfReq := cfRequest{
+		URL:         reqURL,
+		GotoOptions: cfGotoOptions{WaitUntil: "networkidle0"},
+	}
+	reqBody, err := json.Marshal(cfReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal cf request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("create cf request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+c.APIToken)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	httpClient := &http.Client{Timeout: c.Timeout}
+	resp, err := httpClient.Do(httpReq)
+	if err != nil {
+		log.Printf("[WARN] cloudflare request failed for %s, error=%v", reqURL, err)
+		return nil, err
+	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Printf("[WARN] failed to close cf response body, error=%v", err)
+		}
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[WARN] failed to read cf response for %s, error=%v", reqURL, err)
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("cloudflare API error: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	// try JSON response format first: {"success": true, "result": "<html>"}
+	var cfResp cfResponse
+	if err = json.Unmarshal(body, &cfResp); err == nil && cfResp.Success && cfResp.Result != "" {
+		body = []byte(cfResp.Result)
+	}
+	// otherwise use the raw body as-is (raw HTML response)
+
+	header := make(http.Header)
+	header.Set("Content-Type", "text/html; charset=utf-8")
+
+	return &RetrieveResult{
+		Body:   body,
+		URL:    reqURL,
+		Header: header,
 	}, nil
 }

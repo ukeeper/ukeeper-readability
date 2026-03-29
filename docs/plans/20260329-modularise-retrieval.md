@@ -55,11 +55,11 @@
 - Modify: `extractor/retriever.go`
 - Modify: `extractor/retriever_test.go`
 
-- [ ] implement `CloudflareRetriever` struct with `AccountID`, `APIToken`, `BaseURL` (for test override), `Timeout` fields
-- [ ] implement `Retrieve` method: POST to `/accounts/{id}/browser-rendering/content` with `{"url": "...", "gotoOptions": {"waitUntil": "networkidle0"}}`, Bearer token auth
-- [ ] handle response: try JSON `{"success": true, "result": "<html>"}` first, fall back to raw body; set `Content-Type: text/html; charset=utf-8` header
-- [ ] write tests: successful fetch (mock CF API), API error (non-200 status), JSON response format, raw HTML response format
-- [ ] run tests — must pass before next task
+- [x] implement `CloudflareRetriever` struct with `AccountID`, `APIToken`, `BaseURL` (for test override), `Timeout` fields
+- [x] implement `Retrieve` method: POST to `/accounts/{id}/browser-rendering/content` with `{"url": "...", "gotoOptions": {"waitUntil": "networkidle0"}}`, Bearer token auth
+- [x] handle response: try JSON `{"success": true, "result": "<html>"}` first, fall back to raw body; set `Content-Type: text/html; charset=utf-8` header
+- [x] write tests: successful fetch (mock CF API), API error (non-200 status), JSON response format, raw HTML response format
+- [x] run tests — must pass before next task
 
 ### Task 3: Wire Retriever into UReadability
 

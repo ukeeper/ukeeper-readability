@@ -2,6 +2,8 @@ package extractor
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -105,4 +107,99 @@ func TestHTTPRetriever_ResponseHeaders(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "text/html; charset=windows-1251", result.Header.Get("Content-Type"))
 	assert.Equal(t, "test-value", result.Header.Get("X-Custom"))
+}
+
+func TestCloudflareRetriever_Retrieve(t *testing.T) {
+	const testHTML = "<html><body>rendered content</body></html>"
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// verify request method and path
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/accounts/test-account/browser-rendering/content", r.URL.Path)
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+		// verify request body
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		var req cfRequest
+		require.NoError(t, json.Unmarshal(body, &req))
+		assert.Equal(t, "networkidle0", req.GotoOptions.WaitUntil)
+
+		switch req.URL {
+		case "https://example.com/json-response":
+			w.Header().Set("Content-Type", "application/json")
+			resp := cfResponse{Success: true, Result: testHTML}
+			_ = json.NewEncoder(w).Encode(resp)
+		case "https://example.com/raw-html":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write([]byte(testHTML))
+		case "https://example.com/error":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"success":false,"errors":[{"message":"forbidden"}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	tests := []struct {
+		name     string
+		url      string
+		wantBody string
+		wantURL  string
+		wantErr  string
+	}{
+		{
+			name:     "successful fetch with JSON response",
+			url:      "https://example.com/json-response",
+			wantBody: testHTML,
+			wantURL:  "https://example.com/json-response",
+		},
+		{
+			name:     "successful fetch with raw HTML response",
+			url:      "https://example.com/raw-html",
+			wantBody: testHTML,
+			wantURL:  "https://example.com/raw-html",
+		},
+		{
+			name:    "API error returns error",
+			url:     "https://example.com/error",
+			wantErr: "cloudflare API error: status 403",
+		},
+	}
+
+	retriever := &CloudflareRetriever{
+		AccountID: "test-account",
+		APIToken:  "test-token",
+		BaseURL:   ts.URL,
+		Timeout:   5 * time.Second,
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := retriever.Retrieve(context.Background(), tt.url)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				assert.Nil(t, result)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantBody, string(result.Body))
+			assert.Equal(t, tt.wantURL, result.URL)
+			assert.Equal(t, "text/html; charset=utf-8", result.Header.Get("Content-Type"))
+		})
+	}
+}
+
+func TestCloudflareRetriever_DefaultBaseURL(t *testing.T) {
+	// verify that without BaseURL it attempts to connect to the real CF API (which will fail)
+	retriever := &CloudflareRetriever{
+		AccountID: "test-account",
+		APIToken:  "test-token",
+		Timeout:   1 * time.Second,
+	}
+	_, err := retriever.Retrieve(context.Background(), "https://example.com")
+	require.Error(t, err, "should fail when connecting to real CF API without valid credentials")
 }
