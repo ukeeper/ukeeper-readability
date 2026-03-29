@@ -39,6 +39,7 @@ web/           → Go HTML templates (HTMX v2), static assets
 **Key interfaces:**
 - `extractor.Rules` (defined consumer-side in `extractor/readability.go`), implemented by `datastore.RulesDAO`. Mock generated with `//go:generate moq` in extractor package.
 - `extractor.Retriever` (defined in `extractor/retriever.go`) — abstracts URL content fetching. Two implementations: `HTTPRetriever` (default, standard HTTP GET with Safari user-agent) and `CloudflareRetriever` (Cloudflare Browser Rendering API for JS-rendered pages). When `UReadability.Retriever` is nil, defaults to `HTTPRetriever`.
+- `extractor.AIEvaluator` (defined in `extractor/evaluator.go`) — evaluates extraction quality via OpenAI. Implementation: `OpenAIEvaluator`. Mock generated with `//go:generate moq` in extractor/mocks package.
 
 ## Content Extraction Flow
 
@@ -48,6 +49,14 @@ web/           → Go HTML templates (HTMX v2), static assets
 4. If rule found → extract via goquery CSS selector; if fails → fall back to general parser
 5. If no rule → use `go-readability` general parser
 6. Normalize relative links to absolute, extract images concurrently (pick largest as lead image)
+7. If `AIEvaluator` is configured and no existing rule for domain (or force mode): evaluate extraction quality via OpenAI, iterate up to `MaxGPTIter` times with suggested CSS selectors, save the best as a new rule
+
+`ExtractAndImprove()` is the force-mode entry point — ignores stored rules, re-extracts with general parser, then evaluates. Used by the `/api/content-parsed-wrong` protected endpoint.
+
+Optional OpenAI flags (when `--openai-api-key` is set, enables auto-evaluation):
+- `--openai-api-key` / `OPENAI_API_KEY` — OpenAI API key
+- `--openai-model` / `OPENAI_MODEL` — model for evaluation (default: `gpt-5.4-mini`)
+- `--openai-max-iter` / `OPENAI_MAX_ITER` — max evaluation iterations (default: `3`)
 
 ## Key Conventions
 
