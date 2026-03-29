@@ -157,7 +157,7 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
 		return
 	}
-	if s.Token != "" && s.Token != token {
+	if s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(token)) == 0 {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
 		return
 	}
@@ -192,7 +192,7 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 		return
 	}
 
-	if s.Token != "" && s.Token != token {
+	if s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(token)) == 0 {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
 		return
 	}
