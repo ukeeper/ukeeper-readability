@@ -39,7 +39,7 @@ web/           → Go HTML templates (HTMX v2), static assets
 **Key interfaces:**
 - `extractor.Rules` (defined consumer-side in `extractor/readability.go`), implemented by `datastore.RulesDAO`. Mock generated with `//go:generate moq` in extractor package.
 - `extractor.Retriever` (defined in `extractor/retriever.go`) — abstracts URL content fetching. Two implementations: `HTTPRetriever` (default, standard HTTP GET with Safari user-agent) and `CloudflareRetriever` (Cloudflare Browser Rendering API for JS-rendered pages). When `UReadability.Retriever` is nil, defaults to `HTTPRetriever`.
-- `extractor.AIEvaluator` (defined in `extractor/evaluator.go`) — evaluates extraction quality via OpenAI. Implementation: `OpenAIEvaluator`. Mock generated with `//go:generate moq` in extractor/mocks package.
+- `extractor.AIEvaluator` (defined in `extractor/evaluator.go`) — evaluates extraction quality via OpenAI. Implementation: `OpenAIEvaluator`. Mock generated with `//go:generate moq` as test-only mock (`evaluator_mock_test.go`).
 
 ## Content Extraction Flow
 

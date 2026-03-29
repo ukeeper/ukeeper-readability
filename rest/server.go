@@ -90,7 +90,7 @@ func (s *Server) routes(frontendDir string) http.Handler {
 			protectedGroup.HandleFunc("POST /rule", s.saveRule)
 			protectedGroup.HandleFunc("POST /toggle-rule/{id}", s.toggleRule)
 			protectedGroup.HandleFunc("POST /preview", s.handlePreview)
-			protectedGroup.HandleFunc("GET /content-parsed-wrong", s.contentParsedWrong)
+			protectedGroup.HandleFunc("POST /content-parsed-wrong", s.contentParsedWrong)
 		})
 	})
 

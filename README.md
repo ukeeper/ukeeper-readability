@@ -39,7 +39,7 @@ When `--openai-api-key` is set, the service automatically evaluates extraction q
 
 Evaluation only runs for domains without an existing extraction rule. For domains that already have rules, use the force-mode endpoint to re-evaluate:
 
-    GET /api/content-parsed-wrong?url=http://example.com/article
+    POST /api/content-parsed-wrong?url=http://example.com/article
 
 This protected endpoint (requires basicAuth credentials) ignores the stored rule, re-extracts with the general parser, and runs the evaluation loop to find a better selector.
 
@@ -49,6 +49,7 @@ When OpenAI is not configured, extraction works exactly as before — no GPT cal
 
     GET /api/content/v1/parser?token=secret&url=http://aa.com/blah - extract content (emulate Readability API parse call)
     POST /api/extract {url: http://aa.com/blah}  - extract content
+    POST /api/content-parsed-wrong?url=http://aa.com/blah - force re-extraction with AI evaluation (requires basicAuth)
 
 ## Development
 
