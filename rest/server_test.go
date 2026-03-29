@@ -594,6 +594,76 @@ func TestServer_Preview(t *testing.T) {
 	assert.Contains(t, string(b), "Failed to parse form")
 }
 
+func TestServer_ContentParsedWrong(t *testing.T) {
+	ts, srv := startupT(t)
+	defer ts.Close()
+
+	tss := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() == "/article/test" {
+			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			testHTML, err := io.ReadAll(fh)
+			assert.NoError(t, err)
+			assert.NoError(t, fh.Close())
+			_, err = w.Write(testHTML)
+			assert.NoError(t, err)
+			return
+		}
+	}))
+	defer tss.Close()
+
+	t.Run("missing url param", func(t *testing.T) {
+		b, code := getAuth(t, ts.URL+"/api/content-parsed-wrong")
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Contains(t, b, "url parameter is required")
+	})
+
+	t.Run("no AIEvaluator configured", func(t *testing.T) {
+		b, code := getAuth(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
+		assert.Equal(t, http.StatusConflict, code)
+		assert.Contains(t, b, "OpenAI evaluation is not configured")
+	})
+
+	t.Run("successful call", func(t *testing.T) {
+		srv.Readability.AIEvaluator = &goodEvaluatorMock{}
+		srv.Readability.MaxGPTIter = 1
+
+		b, code := getAuth(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
+		assert.Equal(t, http.StatusOK, code)
+
+		var resp extractor.Response
+		err := json.Unmarshal([]byte(b), &resp)
+		require.NoError(t, err)
+		assert.NotEmpty(t, resp.Content)
+
+		// clean up
+		srv.Readability.AIEvaluator = nil
+	})
+
+	t.Run("requires auth", func(t *testing.T) {
+		// unauthenticated request should be rejected
+		b, code := get(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
+		assert.Equal(t, http.StatusUnauthorized, code, b)
+	})
+}
+
+func getAuth(t *testing.T, url string) (response string, statusCode int) {
+	t.Helper()
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	require.NoError(t, err)
+	req.SetBasicAuth("admin", "password")
+	r, err := client.Do(req)
+	require.NoError(t, err)
+	body, err := io.ReadAll(r.Body)
+	require.NoError(t, err)
+	require.NoError(t, r.Body.Close())
+	return string(body), r.StatusCode
+}
+
 func get(t *testing.T, url string) (response string, statusCode int) {
 	r, err := http.Get(url)
 	require.NoError(t, err)
@@ -718,6 +788,13 @@ func newRulesStoreMock() *mocks.RulesMock {
 			return result
 		},
 	}
+}
+
+// goodEvaluatorMock is a simple AIEvaluator mock that always returns Good=true
+type goodEvaluatorMock struct{}
+
+func (m *goodEvaluatorMock) Evaluate(_ context.Context, _, _, _ string) (*extractor.EvalResult, error) {
+	return &extractor.EvalResult{Good: true}, nil
 }
 
 // thanks to https://stackoverflow.com/a/31832326/961092
