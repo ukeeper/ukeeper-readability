@@ -152,6 +152,16 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if s.Token != "" && token == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
+		return
+	}
+	if s.Token != "" && s.Token != token {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
+		return
+	}
+
 	artRequest := extractor.Response{}
 	if err := rest.DecodeJSON(r, &artRequest); err != nil {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, "can't parse request")
