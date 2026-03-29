@@ -211,8 +211,9 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 	maxIter := f.maxGPTIter()
 	log.Printf("[INFO] starting AI evaluation for %s, max iterations=%d", reqURL, maxIter)
 
+	var lastTriedSelector string // tracks last attempted selector (including failed ones)
 	for i := range maxIter {
-		eval, err := f.AIEvaluator.Evaluate(ctx, reqURL, best.Content, htmlBody, bestSelector)
+		eval, err := f.AIEvaluator.Evaluate(ctx, reqURL, best.Content, htmlBody, lastTriedSelector)
 		if err != nil {
 			log.Printf("[WARN] AI evaluation error for %s on iteration %d: %v", reqURL, i, err)
 			return best
@@ -229,6 +230,7 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 		}
 
 		log.Printf("[INFO] AI evaluation: trying selector %q for %s (iteration %d)", eval.Selector, reqURL, i)
+		lastTriedSelector = eval.Selector
 
 		// try the suggested selector on the HTML body
 		rawHTML, err := f.extractWithSelector(htmlBody, eval.Selector)
@@ -244,7 +246,11 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 		improved.Excerpt = f.getSnippet(improved.Content)
 
 		// normalize links and extract images from the new content
-		finalURL, _ := url.Parse(best.URL)
+		finalURL, err := url.Parse(best.URL)
+		if err != nil {
+			log.Printf("[WARN] failed to parse URL %q in evaluateAndImprove: %v", best.URL, err)
+			return best
+		}
 		improved.Rich, improved.AllLinks = f.normalizeLinks(improved.Rich, finalURL)
 		darticle, err := goquery.NewDocumentFromReader(strings.NewReader(improved.Rich))
 		if err == nil {
@@ -258,14 +264,16 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 		bestSelector = eval.Selector
 	}
 
-	// save rule if we found a better selector
+	// save rule if we found a better selector. merge with any existing rule (force mode may
+	// be re-evaluating a domain that already has one) to preserve fields like TestURLs, MatchURLs.
 	if bestSelector != "" && f.Rules != nil {
-		rule := datastore.Rule{
-			Domain:  best.Domain,
-			Content: bestSelector,
-			Enabled: true,
-			User:    aiEvaluatorUser,
+		rule, found := f.Rules.Get(ctx, best.URL)
+		if !found {
+			rule = datastore.Rule{Domain: best.Domain}
 		}
+		rule.Content = bestSelector
+		rule.Enabled = true
+		rule.User = aiEvaluatorUser
 		if _, err := f.Rules.Save(ctx, rule); err != nil {
 			log.Printf("[WARN] failed to save AI-suggested rule for %s: %v", best.Domain, err)
 		} else {
