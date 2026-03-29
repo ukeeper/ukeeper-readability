@@ -39,7 +39,8 @@ func New(connectionURI, dbName string, delay time.Duration) (*MongoServer, error
 
 // Stores contains all DAO instances
 type Stores struct {
-	Rules RulesDAO
+	Rules     RulesDAO
+	Summaries SummariesDAO
 }
 
 // GetStores initialize collections and make indexes
@@ -50,8 +51,15 @@ func (m *MongoServer) GetStores() Stores {
 		{Keys: bson.D{{Key: "domain", Value: 1}, {Key: "match_urls", Value: 1}}},
 	}
 
+	sIndexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "created_at", Value: 1}}},
+		{Keys: bson.D{{Key: "model", Value: 1}}},
+		{Keys: bson.D{{Key: "expires_at", Value: 1}}}, // index for cleaning up expired summaries
+	}
+
 	return Stores{
-		Rules: RulesDAO{Collection: m.collection("rules", rIndexes)},
+		Rules:     RulesDAO{Collection: m.collection("rules", rIndexes)},
+		Summaries: SummariesDAO{Collection: m.collection("summaries", sIndexes)},
 	}
 }
 
