@@ -108,13 +108,13 @@
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] verify `Extract()` without OpenAI configured works exactly as before (existing tests pass)
-- [ ] verify `Extract()` with OpenAI configured evaluates and improves extraction (test with mock evaluator)
-- [ ] verify `Extract()` skips evaluation when domain already has a rule (test with mock rules returning a rule)
-- [ ] verify `ExtractAndImprove()` runs evaluation even when rule exists, using general parser for initial extraction
-- [ ] verify GPT errors don't break extraction (test with evaluator returning error)
-- [ ] verify rule is saved when better selector found (test with mock rules verifying Save call)
-- [ ] run full test suite: `go test -timeout=60s -race ./...`
+- [x] verify `Extract()` without OpenAI configured works exactly as before (existing tests pass)
+- [x] verify `Extract()` with OpenAI configured evaluates and improves extraction (test with mock evaluator)
+- [x] verify `Extract()` skips evaluation when domain already has a rule (test with mock rules returning a rule)
+- [x] verify `ExtractAndImprove()` runs evaluation even when rule exists, using general parser for initial extraction
+- [x] verify GPT errors don't break extraction (test with evaluator returning error)
+- [x] verify rule is saved when better selector found (test with mock rules verifying Save call)
+- [x] run full test suite: `go test -timeout=60s -race ./...`
 
 ### Task 7: [Final] Update documentation
 
