@@ -29,7 +29,7 @@ When these flags are not set, the service uses a standard HTTP client (default).
 ### API
 
     GET /api/content/v1/parser?token=secret&url=http://aa.com/blah - extract content (emulate Readability API parse call)
-    POST /api/extract?token=secret {url: http://aa.com/blah}  - extract content
+    POST /api/extract {url: http://aa.com/blah}  - extract content
 
 ## Development
 

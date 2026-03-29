@@ -152,10 +152,6 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
-	if !s.checkToken(w, r) {
-		return
-	}
-
 	artRequest := extractor.Response{}
 	if err := rest.DecodeJSON(r, &artRequest); err != nil {
 		rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, "can't parse request")

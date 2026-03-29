@@ -108,7 +108,7 @@ func TestServer_WrongAuth(t *testing.T) {
 }
 
 func TestServer_Extract(t *testing.T) {
-	ts, srv := startupT(t)
+	ts, _ := startupT(t)
 	defer ts.Close()
 
 	tss := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -171,44 +171,6 @@ func TestServer_Extract(t *testing.T) {
 	b, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(b))
-	require.NoError(t, resp.Body.Close())
-
-	// token auth
-	srv.Token = "secret"
-
-	// no token
-	resp, err = post(t, ts.URL+"/api/extract",
-		fmt.Sprintf(`{"url": "%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/"}`, tss.URL))
-	require.NoError(t, err)
-	b, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusExpectationFailed, resp.StatusCode, string(b))
-	require.NoError(t, resp.Body.Close())
-	errResponse := rest.JSON{}
-	err = json.Unmarshal(b, &errResponse)
-	require.NoError(t, err)
-	assert.Equal(t, "no token passed", errResponse["error"])
-
-	// wrong token
-	resp, err = post(t, ts.URL+"/api/extract?token=wrong",
-		fmt.Sprintf(`{"url": "%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/"}`, tss.URL))
-	require.NoError(t, err)
-	b, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(b))
-	require.NoError(t, resp.Body.Close())
-	errResponse = rest.JSON{}
-	err = json.Unmarshal(b, &errResponse)
-	require.NoError(t, err)
-	assert.Equal(t, "wrong token passed", errResponse["error"])
-
-	// right token
-	resp, err = post(t, ts.URL+"/api/extract?token=secret",
-		fmt.Sprintf(`{"url": "%s/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/"}`, tss.URL))
-	require.NoError(t, err)
-	b, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
 	require.NoError(t, resp.Body.Close())
 }
 

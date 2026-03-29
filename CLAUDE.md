@@ -53,7 +53,7 @@ web/           → Go HTML templates (HTMX v2), static assets
 
 - Rule upsert is keyed on `domain` — one rule per domain. Rules are disabled (`enabled: false`), never deleted.
 - `rest.Server.Readability` is `extractor.UReadability` by value (not pointer), with `Rules` interface field inside.
-- Both `/api/extract` and `/api/content/v1/parser` require the `token` query parameter when configured. Token comparison uses `subtle.ConstantTimeCompare`. Protected rule management routes use custom `basicAuth` middleware with constant-time comparison.
+- `/api/content/v1/parser` requires the `token` query parameter when configured. Token comparison uses `subtle.ConstantTimeCompare`. Protected rule management routes use custom `basicAuth` middleware with constant-time comparison.
 - Web UI text is in Russian — tests assert on Russian strings, don't change them.
 - Middleware stack: Recoverer → RealIP → AppInfo+Ping → Throttle(50) → Logger.
 - CI: `ci.yml` runs tests and lint in the `build` job (MongoDB via service container); `docker.yml` builds Docker images via `workflow_run` trigger after `build` succeeds (no tests inside Docker).
