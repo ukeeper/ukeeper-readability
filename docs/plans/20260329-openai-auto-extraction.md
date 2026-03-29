@@ -93,10 +93,10 @@
 - Modify: `rest/server.go`
 - Modify: `rest/server_test.go`
 
-- [ ] add `GET /content-parsed-wrong` route in the protected group within `api.Mount("/api")` (full path: `/api/content-parsed-wrong`, requires basicAuth)
-- [ ] implement `contentParsedWrong` handler: validate `url` query param, check `AIEvaluator` is configured, call `s.Readability.ExtractAndImprove()`, return JSON result
-- [ ] write tests: successful call, missing url param, missing OpenAI config (AIEvaluator nil)
-- [ ] run tests — must pass before next task
+- [x] add `GET /content-parsed-wrong` route in the protected group within `api.Mount("/api")` (full path: `/api/content-parsed-wrong`, requires basicAuth)
+- [x] implement `contentParsedWrong` handler: validate `url` query param, check `AIEvaluator` is configured, call `s.Readability.ExtractAndImprove()`, return JSON result
+- [x] write tests: successful call, missing url param, missing OpenAI config (AIEvaluator nil)
+- [x] run tests — must pass before next task
 
 ### Task 5: Run linter and final checks
 

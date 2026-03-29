@@ -84,6 +84,7 @@ func (s *Server) routes(frontendDir string) http.Handler {
 			protectedGroup.HandleFunc("POST /rule", s.saveRule)
 			protectedGroup.HandleFunc("POST /toggle-rule/{id}", s.toggleRule)
 			protectedGroup.HandleFunc("POST /preview", s.handlePreview)
+			protectedGroup.HandleFunc("GET /content-parsed-wrong", s.contentParsedWrong)
 		})
 	})
 
@@ -329,6 +330,29 @@ func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+// contentParsedWrong triggers force-mode re-extraction with AI evaluation.
+// requires AIEvaluator to be configured and a url query parameter.
+func (s *Server) contentParsedWrong(w http.ResponseWriter, r *http.Request) {
+	extractURL := r.URL.Query().Get("url")
+	if extractURL == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "url parameter is required")
+		return
+	}
+
+	if s.Readability.AIEvaluator == nil {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusConflict, nil, "OpenAI evaluation is not configured")
+		return
+	}
+
+	res, err := s.Readability.ExtractAndImprove(r.Context(), extractURL)
+	if err != nil {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, err, "can't extract and improve content")
+		return
+	}
+
+	rest.RenderJSON(w, &res)
 }
 
 // authFake just a dummy post request used for external check for protected resource
