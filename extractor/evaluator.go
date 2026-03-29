@@ -3,6 +3,7 @@ package extractor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -85,7 +86,7 @@ func (e *OpenAIEvaluator) callAPI(ctx context.Context, client *openai.Client, us
 	}
 
 	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("openai returned no choices")
+		return nil, errors.New("openai returned no choices")
 	}
 
 	content := strings.TrimSpace(resp.Choices[0].Message.Content)
@@ -115,14 +116,10 @@ func buildUserPrompt(reqURL, extractedText, htmlBody, prevSelector string) strin
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("I extracted content from this URL: %s\n\n", reqURL))
-	sb.WriteString("Extracted text (first 2000 chars):\n---\n")
-	sb.WriteString(extractedText)
-	sb.WriteString("\n---\n\n")
-	sb.WriteString("Page HTML structure (first 4000 chars):\n---\n")
-	sb.WriteString(htmlBody)
-	sb.WriteString("\n---\n\n")
-	sb.WriteString(`Is this a good extraction of the article content? Consider:
+	_, _ = fmt.Fprintf(&sb, "I extracted content from this URL: %s\n\n", reqURL)
+	_, _ = fmt.Fprintf(&sb, "Extracted text (first 2000 chars):\n---\n%s\n---\n\n", extractedText)
+	_, _ = fmt.Fprintf(&sb, "Page HTML structure (first 4000 chars):\n---\n%s\n---\n\n", htmlBody)
+	_, _ = fmt.Fprint(&sb, `Is this a good extraction of the article content? Consider:
 - Does it contain the main article body (not just navigation/ads/boilerplate)?
 - Is it reasonably complete (not truncated or empty)?
 
@@ -131,8 +128,8 @@ Respond in JSON only, no other text:
 {"good": false, "selector": "article.post-content"} if not, with a CSS selector that targets the main content on this page`)
 
 	if prevSelector != "" {
-		sb.WriteString(fmt.Sprintf("\n\nPrevious attempt with selector %q was tried but didn't improve. "+
-			"Suggest a different selector based on the HTML structure above.", prevSelector))
+		_, _ = fmt.Fprintf(&sb, "\n\nPrevious attempt with selector %q was tried but didn't improve. "+
+			"Suggest a different selector based on the HTML structure above.", prevSelector)
 	}
 
 	return sb.String()
