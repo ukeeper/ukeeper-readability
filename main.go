@@ -27,6 +27,8 @@ var opts struct {
 	MongoURI    string            `short:"m" long:"mongo-uri" env:"MONGO_URI" required:"true" description:"MongoDB connection string"`
 	MongoDelay  time.Duration     `long:"mongo-delay" env:"MONGO_DELAY" default:"0" description:"mongo initial delay"`
 	MongoDB     string            `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
+	CFAccountID string            `long:"cf-account-id" env:"CF_ACCOUNT_ID" description:"Cloudflare account ID for Browser Rendering API"`
+	CFAPIToken  string            `long:"cf-api-token" env:"CF_API_TOKEN" description:"Cloudflare API token with Browser Rendering Edit permission"`
 	Debug       bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
 }
 
@@ -47,11 +49,25 @@ func main() {
 		log.Fatalf("[ERROR] can't connect to mongo %v", err)
 	}
 	stores := db.GetStores()
+
+	var retriever extractor.Retriever
+	if opts.CFAccountID != "" && opts.CFAPIToken != "" {
+		retriever = &extractor.CloudflareRetriever{
+			AccountID: opts.CFAccountID,
+			APIToken:  opts.CFAPIToken,
+			Timeout:   30 * time.Second,
+		}
+		log.Printf("[INFO] using Cloudflare Browser Rendering retriever, account=%s", opts.CFAccountID)
+	} else {
+		log.Print("[INFO] using default HTTP retriever")
+	}
+
 	srv := rest.Server{
 		Readability: extractor.UReadability{
 			TimeOut:     30 * time.Second,
 			SnippetSize: 300,
 			Rules:       stores.Rules,
+			Retriever:   retriever,
 		},
 		Token:       opts.Token,
 		Credentials: opts.Credentials,

@@ -82,10 +82,10 @@
 **Files:**
 - Modify: `main.go`
 
-- [ ] add `CFAccountID string` and `CFAPIToken string` fields to opts struct with `long`/`env` tags
-- [ ] in `main()`, create `CloudflareRetriever` when both flags are set; log which retriever is active
-- [ ] pass retriever to `UReadability` struct
-- [ ] run full test suite: `go test -timeout=60s -race ./...`
+- [x] add `CFAccountID string` and `CFAPIToken string` fields to opts struct with `long`/`env` tags
+- [x] in `main()`, create `CloudflareRetriever` when both flags are set; log which retriever is active
+- [x] pass retriever to `UReadability` struct
+- [x] run full test suite: `go test -timeout=60s -race ./...`
 
 ### Task 5: Generate mock and run linter
 
