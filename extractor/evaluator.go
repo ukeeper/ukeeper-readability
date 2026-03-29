@@ -45,7 +45,6 @@ type OpenAIEvaluator struct {
 	client       *openai.Client
 }
 
-// getClient returns the OpenAI client, creating it once on first use
 func (e *OpenAIEvaluator) getClient() *openai.Client {
 	e.clientOnce.Do(func() {
 		if e.clientConfig != nil {
@@ -71,7 +70,6 @@ func (e *OpenAIEvaluator) Evaluate(ctx context.Context, reqURL, extractedText, h
 		if !errors.Is(err, errInvalidJSON) {
 			return nil, err
 		}
-		cancel() // release the first context before creating a new one
 
 		// retry once on invalid JSON with a fresh timeout
 		log.Printf("[WARN] invalid JSON from OpenAI for %s, retrying once", reqURL)
@@ -87,7 +85,7 @@ func (e *OpenAIEvaluator) Evaluate(ctx context.Context, reqURL, extractedText, h
 }
 
 // callAPI makes a single API call and parses the response JSON.
-// Returns nil EvalResult (without error) if the response is not valid JSON.
+// returns errInvalidJSON if the response is not valid JSON.
 func (e *OpenAIEvaluator) callAPI(ctx context.Context, client *openai.Client, userPrompt string) (*EvalResult, error) {
 	resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model: e.Model,
