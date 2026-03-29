@@ -192,7 +192,6 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	return rb, nil
 }
 
-// maxGPTIter returns MaxGPTIter or the default if not set
 func (f *UReadability) maxGPTIter() int {
 	if f.MaxGPTIter > 0 {
 		return f.MaxGPTIter
@@ -239,29 +238,31 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 			continue
 		}
 
-		// rebuild the response with new content
+		// rebuild the response with new content (defer link normalisation and image extraction to after the loop)
 		improved := *best
 		improved.Content = f.getText(rawHTML, best.Title)
 		improved.Rich = rawHTML
 		improved.Excerpt = f.getSnippet(improved.Content)
 
-		// normalize links and extract images from the new content
+		best = &improved
+		bestSelector = eval.Selector
+	}
+
+	// post-process the final result: normalise links and extract images once
+	if bestSelector != "" {
 		finalURL, err := url.Parse(best.URL)
 		if err != nil {
 			log.Printf("[WARN] failed to parse URL %q in evaluateAndImprove: %v", best.URL, err)
 			return best
 		}
-		improved.Rich, improved.AllLinks = f.normalizeLinks(improved.Rich, finalURL)
-		darticle, err := goquery.NewDocumentFromReader(strings.NewReader(improved.Rich))
+		best.Rich, best.AllLinks = f.normalizeLinks(best.Rich, finalURL)
+		darticle, err := goquery.NewDocumentFromReader(strings.NewReader(best.Rich))
 		if err == nil {
 			if im, allImages, ok := f.extractPics(darticle.Find("img"), reqURL); ok {
-				improved.Image = im
-				improved.AllImages = allImages
+				best.Image = im
+				best.AllImages = allImages
 			}
 		}
-
-		best = &improved
-		bestSelector = eval.Selector
 	}
 
 	// save rule if we found a better selector. merge with any existing rule (force mode may
@@ -317,16 +318,10 @@ func (f *UReadability) getContent(_ context.Context, body, reqURL string, rule *
 	// custom rules parser
 	customParser := func(body, reqURL string, rule datastore.Rule) (content, rich string, err error) {
 		log.Printf("[DEBUG] custom extractor for %s", reqURL)
-		dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+		res, err := f.extractWithSelector(body, rule.Content)
 		if err != nil {
 			return "", "", err
 		}
-		var res string
-		dbody.Find(rule.Content).Each(func(_ int, s *goquery.Selection) {
-			if html, err := s.Html(); err == nil {
-				res += html
-			}
-		})
 		if res == "" {
 			return "", "", fmt.Errorf("nothing extracted from %s, rule=%v", reqURL, rule)
 		}
