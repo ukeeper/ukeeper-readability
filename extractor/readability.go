@@ -18,6 +18,8 @@ import (
 	"github.com/ukeeper/ukeeper-readability/datastore"
 )
 
+const defaultMaxGPTIter = 3
+
 //go:generate moq -out mocks/rules.go -pkg mocks -skip-ensure -fmt goimports . Rules
 
 // Rules interface with all methods to access datastore
@@ -35,6 +37,8 @@ type UReadability struct {
 	SnippetSize int
 	Rules       Rules
 	Retriever   Retriever
+	AIEvaluator AIEvaluator
+	MaxGPTIter  int
 
 	defaultRetrieverOnce sync.Once
 	defaultRetriever     Retriever
@@ -78,17 +82,25 @@ const (
 
 // Extract fetches page and retrieves article
 func (f *UReadability) Extract(ctx context.Context, reqURL string) (*Response, error) {
-	return f.extractWithRules(ctx, reqURL, nil)
+	return f.extractWithRules(ctx, reqURL, nil, false)
 }
 
 // ExtractByRule fetches page and retrieves article using a specific rule
 func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
-	return f.extractWithRules(ctx, reqURL, rule)
+	return f.extractWithRules(ctx, reqURL, rule, false)
 }
 
-// ExtractWithRules is the core function that handles extraction with or without a specific rule
-func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
-	log.Printf("[INFO] extract %s", reqURL)
+// ExtractAndImprove fetches page and re-extracts using general parser, then evaluates with AI.
+// Used when a user reports that extraction for a URL is bad — ignores existing rules.
+func (f *UReadability) ExtractAndImprove(ctx context.Context, reqURL string) (*Response, error) {
+	return f.extractWithRules(ctx, reqURL, nil, true)
+}
+
+// extractWithRules is the core function that handles extraction with or without a specific rule.
+// when force=true, the initial extraction uses the general parser (ignores stored rules),
+// and evaluation is always triggered regardless of existing rules.
+func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule, force bool) (*Response, error) { //nolint:revive // force flag is intentional, controls extraction mode
+	log.Printf("[INFO] extract %s (force=%v)", reqURL, force)
 	rb := &Response{}
 
 	result, err := f.retriever().Retrieve(ctx, reqURL)
@@ -100,7 +112,13 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 
 	var body string
 	rb.ContentType, rb.Charset, body = f.toUtf8(result.Body, result.Header)
-	rb.Content, rb.Rich, err = f.getContent(ctx, body, reqURL, rule)
+
+	if force {
+		// force mode: use general parser, skip stored rules entirely
+		rb.Content, rb.Rich, err = f.getContentGeneral(body)
+	} else {
+		rb.Content, rb.Rich, err = f.getContent(ctx, body, reqURL, rule)
+	}
 	if err != nil {
 		log.Printf("[WARN] failed to parse %s, error=%v", reqURL, err)
 		return nil, err
@@ -132,8 +150,127 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 		rb.AllImages = allImages
 	}
 
+	// run AI evaluation if configured
+	if f.AIEvaluator != nil {
+		shouldEvaluate := force // always evaluate in force mode
+		if !force {
+			// in normal mode, only evaluate when domain has no existing rule
+			if f.Rules != nil {
+				if _, found := f.Rules.Get(ctx, reqURL); !found {
+					shouldEvaluate = true
+				}
+			} else {
+				shouldEvaluate = true
+			}
+		}
+		if shouldEvaluate {
+			rb = f.evaluateAndImprove(ctx, reqURL, body, rb)
+		}
+	}
+
 	log.Printf("[INFO] completed for %s, url=%s", rb.Title, rb.URL)
 	return rb, nil
+}
+
+// maxGPTIter returns MaxGPTIter or the default if not set
+func (f *UReadability) maxGPTIter() int {
+	if f.MaxGPTIter > 0 {
+		return f.MaxGPTIter
+	}
+	return defaultMaxGPTIter
+}
+
+// evaluateAndImprove runs the AI evaluation loop. It sends the current extraction to the evaluator,
+// and if the evaluator suggests a CSS selector, tries it on the HTML body. Iterates up to MaxGPTIter times.
+// If a better selector is found, saves it as a rule. All errors are logged and swallowed — the original
+// result is returned unchanged on any failure.
+func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody string, result *Response) *Response {
+	best := result
+	var bestSelector string
+
+	maxIter := f.maxGPTIter()
+	log.Printf("[INFO] starting AI evaluation for %s, max iterations=%d", reqURL, maxIter)
+
+	for i := range maxIter {
+		eval, err := f.AIEvaluator.Evaluate(ctx, reqURL, best.Content, htmlBody)
+		if err != nil {
+			log.Printf("[WARN] AI evaluation error for %s on iteration %d: %v", reqURL, i, err)
+			return best
+		}
+
+		if eval.Good {
+			log.Printf("[INFO] AI evaluation: extraction is good for %s on iteration %d", reqURL, i)
+			break
+		}
+
+		if eval.Selector == "" {
+			log.Printf("[WARN] AI evaluation: bad extraction but no selector suggested for %s", reqURL)
+			continue
+		}
+
+		log.Printf("[INFO] AI evaluation: trying selector %q for %s (iteration %d)", eval.Selector, reqURL, i)
+
+		// try the suggested selector on the HTML body
+		newContent, newRich, err := f.extractWithSelector(htmlBody, eval.Selector)
+		if err != nil || newContent == "" {
+			log.Printf("[WARN] AI selector %q produced no content for %s: %v", eval.Selector, reqURL, err)
+			continue
+		}
+
+		// rebuild the response with new content
+		improved := *best
+		improved.Content = f.getText(newContent, best.Title)
+		improved.Rich = newRich
+		improved.Excerpt = f.getSnippet(improved.Content)
+		best = &improved
+		bestSelector = eval.Selector
+	}
+
+	// save rule if we found a better selector
+	if bestSelector != "" && f.Rules != nil {
+		rule := datastore.Rule{
+			Domain:  best.Domain,
+			Content: bestSelector,
+			Enabled: true,
+			User:    "ai-evaluator",
+		}
+		if _, err := f.Rules.Save(ctx, rule); err != nil {
+			log.Printf("[WARN] failed to save AI-suggested rule for %s: %v", best.Domain, err)
+		} else {
+			log.Printf("[INFO] saved AI-suggested rule for %s: %q", best.Domain, bestSelector)
+		}
+	}
+
+	return best
+}
+
+// extractWithSelector applies a CSS selector to the HTML body and returns the extracted content
+func (f *UReadability) extractWithSelector(htmlBody, selector string) (content, rich string, err error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlBody))
+	if err != nil {
+		return "", "", err
+	}
+	var res string
+	doc.Find(selector).Each(func(_ int, s *goquery.Selection) {
+		if html, err := s.Html(); err == nil {
+			res += html
+		}
+	})
+	if res == "" {
+		return "", "", nil
+	}
+	return f.getText(res, ""), res, nil
+}
+
+// getContentGeneral extracts content using the general readability parser only,
+// bypassing any stored rules. Used in force mode.
+func (f *UReadability) getContentGeneral(body string) (content, rich string, err error) {
+	doc, err := readability.NewDocument(body)
+	if err != nil {
+		return "", "", err
+	}
+	content, rich = doc.ContentWithHTML()
+	return content, rich, nil
 }
 
 // getContent retrieves content from raw body string, both content (text only) and rich (with html tags)

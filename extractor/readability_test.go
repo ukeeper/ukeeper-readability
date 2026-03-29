@@ -2,6 +2,7 @@ package extractor
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -255,6 +256,287 @@ func TestExtractWithCustomRetriever(t *testing.T) {
 	calls := mockRetriever.RetrieveCalls()
 	require.Len(t, calls, 1)
 	assert.Equal(t, "https://example.com/test-page", calls[0].URL)
+}
+
+func TestExtractWithEvaluatorGoodOnFirstTry(t *testing.T) {
+	testHTML := `<html><head><title>Test Article</title></head>
+<body><article><p>This is excellent article content that was extracted properly.</p></article></body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	evalCalls := 0
+	mockEvaluator := &AIEvaluatorMock{
+		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+			evalCalls++
+			return &EvalResult{Good: true}, nil
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		AIEvaluator: mockEvaluator,
+	}
+
+	res, err := lr.Extract(context.Background(), "https://example.com/article")
+	require.NoError(t, err)
+	assert.NotEmpty(t, res.Content)
+	assert.Contains(t, res.Content, "excellent article content")
+	assert.Equal(t, 1, evalCalls, "should call evaluator exactly once")
+}
+
+func TestExtractWithEvaluatorBadThenImproved(t *testing.T) {
+	testHTML := `<html><head><title>Test Article</title></head>
+<body>
+<nav>Navigation menu items</nav>
+<div class="article-body"><p>This is the real article content that should be extracted.</p></div>
+<footer>Footer stuff</footer>
+</body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	evalCalls := 0
+	mockEvaluator := &AIEvaluatorMock{
+		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+			evalCalls++
+			if evalCalls == 1 {
+				return &EvalResult{Good: false, Selector: "div.article-body"}, nil
+			}
+			return &EvalResult{Good: true}, nil
+		},
+	}
+
+	saveCalled := false
+	mockRules := &mocks.RulesMock{
+		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
+			return datastore.Rule{}, false // no existing rule
+		},
+		SaveFunc: func(_ context.Context, rule datastore.Rule) (datastore.Rule, error) {
+			saveCalled = true
+			assert.Equal(t, "example.com", rule.Domain)
+			assert.Equal(t, "div.article-body", rule.Content)
+			assert.True(t, rule.Enabled)
+			assert.Equal(t, "ai-evaluator", rule.User)
+			return rule, nil
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		AIEvaluator: mockEvaluator,
+		Rules:       mockRules,
+	}
+
+	res, err := lr.Extract(context.Background(), "https://example.com/article")
+	require.NoError(t, err)
+	assert.Contains(t, res.Content, "real article content")
+	assert.Equal(t, 2, evalCalls, "should call evaluator twice (bad then good)")
+	assert.True(t, saveCalled, "should save the rule")
+}
+
+func TestExtractWithoutEvaluator(t *testing.T) {
+	testHTML := `<html><head><title>Test</title></head>
+<body><article><p>Content here.</p></article></body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		// no AIEvaluator set
+	}
+
+	res, err := lr.Extract(context.Background(), "https://example.com/test")
+	require.NoError(t, err)
+	assert.NotEmpty(t, res.Content)
+	assert.Equal(t, "Test", res.Title)
+}
+
+func TestExtractWithEvaluatorError(t *testing.T) {
+	testHTML := `<html><head><title>Test</title></head>
+<body><article><p>Original content.</p></article></body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	mockEvaluator := &AIEvaluatorMock{
+		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+			return nil, fmt.Errorf("openai API error: connection refused")
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		AIEvaluator: mockEvaluator,
+	}
+
+	res, err := lr.Extract(context.Background(), "https://example.com/test")
+	require.NoError(t, err, "should not fail even when evaluator errors")
+	assert.NotEmpty(t, res.Content)
+	assert.Contains(t, res.Content, "Original content")
+}
+
+func TestExtractSkipsEvaluationWhenRuleExists(t *testing.T) {
+	testHTML := `<html><head><title>Test</title></head>
+<body><div class="post"><p>Post content.</p></div></body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	evalCalled := false
+	mockEvaluator := &AIEvaluatorMock{
+		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+			evalCalled = true
+			return &EvalResult{Good: true}, nil
+		},
+	}
+
+	mockRules := &mocks.RulesMock{
+		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
+			return datastore.Rule{Content: "div.post", Enabled: true}, true // existing rule
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		AIEvaluator: mockEvaluator,
+		Rules:       mockRules,
+	}
+
+	res, err := lr.Extract(context.Background(), "https://example.com/test")
+	require.NoError(t, err)
+	assert.NotEmpty(t, res.Content)
+	assert.False(t, evalCalled, "should not call evaluator when domain has existing rule")
+}
+
+func TestExtractAndImproveForceMode(t *testing.T) {
+	testHTML := `<html><head><title>Test Article</title></head>
+<body>
+<nav>Nav stuff</nav>
+<div class="main-content"><p>The real article text that should be found.</p></div>
+<aside>Sidebar</aside>
+</body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	evalCalls := 0
+	mockEvaluator := &AIEvaluatorMock{
+		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+			evalCalls++
+			if evalCalls == 1 {
+				return &EvalResult{Good: false, Selector: "div.main-content"}, nil
+			}
+			return &EvalResult{Good: true}, nil
+		},
+	}
+
+	// existing rule should be ignored in force mode
+	mockRules := &mocks.RulesMock{
+		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
+			return datastore.Rule{Content: "nav", Enabled: true}, true
+		},
+		SaveFunc: func(_ context.Context, rule datastore.Rule) (datastore.Rule, error) {
+			assert.Equal(t, "div.main-content", rule.Content)
+			return rule, nil
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		AIEvaluator: mockEvaluator,
+		Rules:       mockRules,
+	}
+
+	res, err := lr.ExtractAndImprove(context.Background(), "https://example.com/article")
+	require.NoError(t, err)
+	assert.Contains(t, res.Content, "real article text")
+	assert.True(t, evalCalls >= 1, "should call evaluator even though rule exists")
+
+	// verify Get was NOT used for extraction (force mode skips stored rules)
+	// the Get mock returns "nav" selector which would extract "Nav stuff"
+	// but we should have "real article text" from the AI-suggested selector
+	assert.NotContains(t, res.Content, "Nav stuff")
+}
+
+func TestExtractWithEvaluatorBadSelectorNoMatch(t *testing.T) {
+	testHTML := `<html><head><title>Test</title></head>
+<body><article><p>Original content from readability.</p></article></body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{Body: []byte(testHTML), URL: reqURL, Header: header}, nil
+		},
+	}
+
+	evalCalls := 0
+	mockEvaluator := &AIEvaluatorMock{
+		EvaluateFunc: func(_ context.Context, _, _, _ string) (*EvalResult, error) {
+			evalCalls++
+			if evalCalls <= 2 {
+				return &EvalResult{Good: false, Selector: "div.nonexistent"}, nil
+			}
+			return &EvalResult{Good: true}, nil
+		},
+	}
+
+	lr := UReadability{
+		TimeOut:     30 * time.Second,
+		SnippetSize: 200,
+		Retriever:   mockRetriever,
+		AIEvaluator: mockEvaluator,
+		MaxGPTIter:  3,
+	}
+
+	res, err := lr.Extract(context.Background(), "https://example.com/test")
+	require.NoError(t, err)
+	assert.Contains(t, res.Content, "Original content from readability")
+	assert.Equal(t, 3, evalCalls, "should iterate all 3 times")
 }
 
 func TestGetContentCustom(t *testing.T) {

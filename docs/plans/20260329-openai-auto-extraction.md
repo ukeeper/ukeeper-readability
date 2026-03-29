@@ -62,18 +62,18 @@
 - Modify: `extractor/readability.go`
 - Modify: `extractor/readability_test.go`
 
-- [ ] add `AIEvaluator AIEvaluator` and `MaxGPTIter int` fields to `UReadability` struct
-- [ ] change `extractWithRules` signature to `extractWithRules(ctx, reqURL string, rule *datastore.Rule, force bool)`
-- [ ] update callers: `Extract()` passes `force=false`, `ExtractByRule()` passes `force=false`
-- [ ] add `ExtractAndImprove(ctx, url)` public method — calls `extractWithRules(ctx, url, nil, true)`
-- [ ] add `evaluateAndImprove(ctx, reqURL, htmlBody string, result *Response) *Response` private method
-- [ ] implement evaluation loop: up to `MaxGPTIter` iterations (default 3); send URL + result.Content + htmlBody to evaluator; try suggested selector on htmlBody via goquery; feed new extraction back to GPT on next iteration; if GPT says good, break
-- [ ] in `extractWithRules`: after extraction, call `evaluateAndImprove` if: `AIEvaluator != nil` AND (`force` OR no existing rule for domain)
-- [ ] **force mode semantics**: when `force=true`, pass `nil` as rule to `getContent()` so initial extraction uses the general parser (not the stored rule), then let GPT suggest a new selector
-- [ ] if better selector found, save rule via `f.Rules.Save()` with domain and selector
-- [ ] all GPT/evaluation errors logged and swallowed — original result returned unchanged
-- [ ] write tests: extraction with evaluator (good on first try), extraction with evaluator (bad, improved on retry), extraction without evaluator (unchanged behaviour), GPT error (fail open), force mode ignores existing rules and extracts with general parser
-- [ ] run tests — must pass before next task
+- [x] add `AIEvaluator AIEvaluator` and `MaxGPTIter int` fields to `UReadability` struct
+- [x] change `extractWithRules` signature to `extractWithRules(ctx, reqURL string, rule *datastore.Rule, force bool)`
+- [x] update callers: `Extract()` passes `force=false`, `ExtractByRule()` passes `force=false`
+- [x] add `ExtractAndImprove(ctx, url)` public method — calls `extractWithRules(ctx, url, nil, true)`
+- [x] add `evaluateAndImprove(ctx, reqURL, htmlBody string, result *Response) *Response` private method
+- [x] implement evaluation loop: up to `MaxGPTIter` iterations (default 3); send URL + result.Content + htmlBody to evaluator; try suggested selector on htmlBody via goquery; feed new extraction back to GPT on next iteration; if GPT says good, break
+- [x] in `extractWithRules`: after extraction, call `evaluateAndImprove` if: `AIEvaluator != nil` AND (`force` OR no existing rule for domain)
+- [x] **force mode semantics**: when `force=true`, pass `nil` as rule to `getContent()` so initial extraction uses the general parser (not the stored rule), then let GPT suggest a new selector
+- [x] if better selector found, save rule via `f.Rules.Save()` with domain and selector
+- [x] all GPT/evaluation errors logged and swallowed — original result returned unchanged
+- [x] write tests: extraction with evaluator (good on first try), extraction with evaluator (bad, improved on retry), extraction without evaluator (unchanged behaviour), GPT error (fail open), force mode ignores existing rules and extracts with general parser
+- [x] run tests — must pass before next task
 
 ### Task 3: Add CLI flags and wiring in main.go
 
