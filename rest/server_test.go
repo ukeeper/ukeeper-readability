@@ -679,10 +679,6 @@ func TestServer_ContentParsedWrong(t *testing.T) {
 	})
 }
 
-func getAuth(t *testing.T, url string) (response string, statusCode int) {
-	return doAuth(t, "GET", url)
-}
-
 func postAuth(t *testing.T, url string) (response string, statusCode int) {
 	return doAuth(t, "POST", url)
 }
