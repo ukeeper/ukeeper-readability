@@ -144,9 +144,12 @@ func (c *CloudflareRetriever) Retrieve(ctx context.Context, reqURL string) (*Ret
 	// try JSON response format first: {"success": true, "result": "<html>"}
 	var cfResp cfResponse
 	if err = json.Unmarshal(body, &cfResp); err == nil {
-		if cfResp.Success && cfResp.Result != "" {
+		switch {
+		case cfResp.Success && cfResp.Result != "":
 			body = []byte(cfResp.Result)
-		} else if !cfResp.Success {
+		case cfResp.Success && cfResp.Result == "":
+			return nil, fmt.Errorf("cloudflare returned empty content for %s", reqURL)
+		default: // !cfResp.Success
 			return nil, fmt.Errorf("cloudflare API returned success=false for %s", reqURL)
 		}
 	}

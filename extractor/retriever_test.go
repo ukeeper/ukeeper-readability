@@ -214,6 +214,24 @@ func TestCloudflareRetriever_DefaultBaseURL(t *testing.T) {
 	assert.Equal(t, "/accounts/my-account/browser-rendering/content", capturedPath)
 }
 
+func TestCloudflareRetriever_SuccessEmptyResult(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"result":""}`))
+	}))
+	defer ts.Close()
+
+	retriever := &CloudflareRetriever{
+		AccountID: "test-account",
+		APIToken:  "test-token",
+		BaseURL:   ts.URL,
+		Timeout:   5 * time.Second,
+	}
+	_, err := retriever.Retrieve(context.Background(), "https://example.com")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty content")
+}
+
 func TestCloudflareRetriever_SuccessFalse(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
