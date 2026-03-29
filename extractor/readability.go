@@ -192,7 +192,7 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 	log.Printf("[INFO] starting AI evaluation for %s, max iterations=%d", reqURL, maxIter)
 
 	for i := range maxIter {
-		eval, err := f.AIEvaluator.Evaluate(ctx, reqURL, best.Content, htmlBody)
+		eval, err := f.AIEvaluator.Evaluate(ctx, reqURL, best.Content, htmlBody, bestSelector)
 		if err != nil {
 			log.Printf("[WARN] AI evaluation error for %s on iteration %d: %v", reqURL, i, err)
 			return best
@@ -211,17 +211,29 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 		log.Printf("[INFO] AI evaluation: trying selector %q for %s (iteration %d)", eval.Selector, reqURL, i)
 
 		// try the suggested selector on the HTML body
-		newContent, newRich, err := f.extractWithSelector(htmlBody, eval.Selector)
-		if err != nil || newContent == "" {
+		rawHTML, err := f.extractWithSelector(htmlBody, eval.Selector)
+		if err != nil || rawHTML == "" {
 			log.Printf("[WARN] AI selector %q produced no content for %s: %v", eval.Selector, reqURL, err)
 			continue
 		}
 
 		// rebuild the response with new content
 		improved := *best
-		improved.Content = f.getText(newContent, best.Title)
-		improved.Rich = newRich
+		improved.Content = f.getText(rawHTML, best.Title)
+		improved.Rich = rawHTML
 		improved.Excerpt = f.getSnippet(improved.Content)
+
+		// normalize links and extract images from the new content
+		finalURL, _ := url.Parse(best.URL)
+		improved.Rich, improved.AllLinks = f.normalizeLinks(improved.Rich, finalURL)
+		darticle, err := goquery.NewDocumentFromReader(strings.NewReader(improved.Rich))
+		if err == nil {
+			if im, allImages, ok := f.extractPics(darticle.Find("img"), reqURL); ok {
+				improved.Image = im
+				improved.AllImages = allImages
+			}
+		}
+
 		best = &improved
 		bestSelector = eval.Selector
 	}
@@ -244,11 +256,11 @@ func (f *UReadability) evaluateAndImprove(ctx context.Context, reqURL, htmlBody 
 	return best
 }
 
-// extractWithSelector applies a CSS selector to the HTML body and returns the extracted content
-func (f *UReadability) extractWithSelector(htmlBody, selector string) (content, rich string, err error) {
+// extractWithSelector applies a CSS selector to the HTML body and returns the raw extracted HTML
+func (f *UReadability) extractWithSelector(htmlBody, selector string) (string, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlBody))
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	var res string
 	doc.Find(selector).Each(func(_ int, s *goquery.Selection) {
@@ -256,10 +268,7 @@ func (f *UReadability) extractWithSelector(htmlBody, selector string) (content, 
 			res += html
 		}
 	})
-	if res == "" {
-		return "", "", nil
-	}
-	return f.getText(res, ""), res, nil
+	return res, nil
 }
 
 // getContentGeneral extracts content using the general readability parser only,
@@ -277,16 +286,6 @@ func (f *UReadability) getContentGeneral(body string) (content, rich string, err
 // if rule is provided, it uses custom rule, otherwise tries to retrieve one from the storage,
 // and at last tries to use general readability parser
 func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule *datastore.Rule) (content, rich string, err error) {
-	// general parser
-	genParser := func(body, _ string) (content, rich string, err error) {
-		doc, err := readability.NewDocument(body)
-		if err != nil {
-			return "", "", err
-		}
-		content, rich = doc.ContentWithHTML()
-		return content, rich, nil
-	}
-
 	// custom rules parser
 	customParser := func(body, reqURL string, rule datastore.Rule) (content, rich string, err error) {
 		log.Printf("[DEBUG] custom extractor for %s", reqURL)
@@ -324,7 +323,7 @@ func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule
 		log.Print("[DEBUG] no rules defined!")
 	}
 
-	return genParser(body, reqURL)
+	return f.getContentGeneral(body)
 }
 
 // makes all links absolute and returns all found links

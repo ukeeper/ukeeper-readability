@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	log "github.com/go-pkgz/lgr"
 	openai "github.com/sashabaranov/go-openai"
@@ -15,7 +17,7 @@ import (
 
 // AIEvaluator evaluates extraction quality and suggests CSS selectors for improvement
 type AIEvaluator interface {
-	Evaluate(ctx context.Context, url, extractedText, htmlBody string) (*EvalResult, error)
+	Evaluate(ctx context.Context, url, extractedText, htmlBody, prevSelector string) (*EvalResult, error)
 }
 
 // EvalResult holds the evaluation outcome from the AI model
@@ -27,7 +29,10 @@ type EvalResult struct {
 const (
 	maxExtractedTextLen = 2000
 	maxHTMLBodyLen      = 4000
+	openaiCallTimeout   = 60 * time.Second
 )
+
+var errInvalidJSON = errors.New("invalid JSON response from OpenAI")
 
 const systemPrompt = `You are a web content extraction expert. You evaluate whether extracted article text is complete and correct, and suggest CSS selectors when extraction is poor.`
 
@@ -36,34 +41,41 @@ type OpenAIEvaluator struct {
 	APIKey       string
 	Model        string
 	clientConfig *openai.ClientConfig // optional, for testing
+	clientOnce   sync.Once
+	client       *openai.Client
+}
+
+// getClient returns the OpenAI client, creating it once on first use
+func (e *OpenAIEvaluator) getClient() *openai.Client {
+	e.clientOnce.Do(func() {
+		if e.clientConfig != nil {
+			e.client = openai.NewClientWithConfig(*e.clientConfig)
+		} else {
+			e.client = openai.NewClient(e.APIKey)
+		}
+	})
+	return e.client
 }
 
 // Evaluate sends the extracted text and HTML body to OpenAI for evaluation.
 // Returns EvalResult indicating whether extraction is good, or suggests a CSS selector.
-func (e *OpenAIEvaluator) Evaluate(ctx context.Context, reqURL, extractedText, htmlBody string) (*EvalResult, error) {
-	var client *openai.Client
-	if e.clientConfig != nil {
-		client = openai.NewClientWithConfig(*e.clientConfig)
-	} else {
-		client = openai.NewClient(e.APIKey)
-	}
+func (e *OpenAIEvaluator) Evaluate(ctx context.Context, reqURL, extractedText, htmlBody, prevSelector string) (*EvalResult, error) {
+	callCtx, cancel := context.WithTimeout(ctx, openaiCallTimeout)
+	defer cancel()
 
-	userPrompt := buildUserPrompt(reqURL, extractedText, htmlBody, "")
-	result, err := e.callAPI(ctx, client, userPrompt)
+	client := e.getClient()
+	userPrompt := buildUserPrompt(reqURL, extractedText, htmlBody, prevSelector)
+
+	result, err := e.callAPI(callCtx, client, userPrompt)
 	if err != nil {
-		return nil, err
-	}
-
-	// retry once on invalid JSON
-	if result == nil {
-		log.Printf("[WARN] invalid JSON from OpenAI for %s, retrying once", reqURL)
-		result, err = e.callAPI(ctx, client, userPrompt)
-		if err != nil {
+		if !errors.Is(err, errInvalidJSON) {
 			return nil, err
 		}
-		if result == nil {
-			log.Printf("[WARN] invalid JSON from OpenAI for %s on retry, failing open", reqURL)
-			return &EvalResult{Good: true}, nil
+		// retry once on invalid JSON
+		log.Printf("[WARN] invalid JSON from OpenAI for %s, retrying once", reqURL)
+		result, err = e.callAPI(callCtx, client, userPrompt)
+		if err != nil {
+			return nil, fmt.Errorf("openai retry for %s: %w", reqURL, err)
 		}
 	}
 
@@ -94,25 +106,25 @@ func (e *OpenAIEvaluator) callAPI(ctx context.Context, client *openai.Client, us
 }
 
 // parseEvalResponse parses the JSON response from the model.
-// Returns nil EvalResult (without error) if JSON is invalid.
+// Returns errInvalidJSON if JSON is invalid.
 func parseEvalResponse(content string) (*EvalResult, error) {
 	var raw struct {
 		Good     bool   `json:"good"`
 		Selector string `json:"selector"`
 	}
 	if err := json.Unmarshal([]byte(content), &raw); err != nil {
-		return nil, nil //nolint:nilnil // nil result signals invalid JSON, handled by caller
+		return nil, errInvalidJSON
 	}
 
 	return &EvalResult{Good: raw.Good, Selector: raw.Selector}, nil
 }
 
 func buildUserPrompt(reqURL, extractedText, htmlBody, prevSelector string) string {
-	if len(extractedText) > maxExtractedTextLen {
-		extractedText = extractedText[:maxExtractedTextLen]
+	if runes := []rune(extractedText); len(runes) > maxExtractedTextLen {
+		extractedText = string(runes[:maxExtractedTextLen])
 	}
-	if len(htmlBody) > maxHTMLBodyLen {
-		htmlBody = htmlBody[:maxHTMLBodyLen]
+	if runes := []rune(htmlBody); len(runes) > maxHTMLBodyLen {
+		htmlBody = string(runes[:maxHTMLBodyLen])
 	}
 
 	var sb strings.Builder

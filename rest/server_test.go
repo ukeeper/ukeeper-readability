@@ -616,13 +616,13 @@ func TestServer_ContentParsedWrong(t *testing.T) {
 	defer tss.Close()
 
 	t.Run("missing url param", func(t *testing.T) {
-		b, code := getAuth(t, ts.URL+"/api/content-parsed-wrong")
+		b, code := postAuth(t, ts.URL+"/api/content-parsed-wrong")
 		assert.Equal(t, http.StatusBadRequest, code)
 		assert.Contains(t, b, "url parameter is required")
 	})
 
 	t.Run("no AIEvaluator configured", func(t *testing.T) {
-		b, code := getAuth(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
+		b, code := postAuth(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
 		assert.Equal(t, http.StatusConflict, code)
 		assert.Contains(t, b, "OpenAI evaluation is not configured")
 	})
@@ -631,7 +631,7 @@ func TestServer_ContentParsedWrong(t *testing.T) {
 		srv.Readability.AIEvaluator = &goodEvaluatorMock{}
 		srv.Readability.MaxGPTIter = 1
 
-		b, code := getAuth(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
+		b, code := postAuth(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
 		assert.Equal(t, http.StatusOK, code)
 
 		var resp extractor.Response
@@ -644,16 +644,31 @@ func TestServer_ContentParsedWrong(t *testing.T) {
 	})
 
 	t.Run("requires auth", func(t *testing.T) {
-		// unauthenticated request should be rejected
-		b, code := get(t, ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test")
-		assert.Equal(t, http.StatusUnauthorized, code, b)
+		// unauthenticated POST should be rejected
+		client := &http.Client{Timeout: 5 * time.Second}
+		req, err := http.NewRequest("POST", ts.URL+"/api/content-parsed-wrong?url="+tss.URL+"/article/test", nil)
+		require.NoError(t, err)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(body))
 	})
 }
 
 func getAuth(t *testing.T, url string) (response string, statusCode int) {
+	return doAuth(t, "GET", url)
+}
+
+func postAuth(t *testing.T, url string) (response string, statusCode int) {
+	return doAuth(t, "POST", url)
+}
+
+func doAuth(t *testing.T, method, url string) (response string, statusCode int) {
 	t.Helper()
 	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	require.NoError(t, err)
 	req.SetBasicAuth("admin", "password")
 	r, err := client.Do(req)
@@ -793,7 +808,7 @@ func newRulesStoreMock() *mocks.RulesMock {
 // goodEvaluatorMock is a simple AIEvaluator mock that always returns Good=true
 type goodEvaluatorMock struct{}
 
-func (m *goodEvaluatorMock) Evaluate(_ context.Context, _, _, _ string) (*extractor.EvalResult, error) {
+func (m *goodEvaluatorMock) Evaluate(_ context.Context, _, _, _, _ string) (*extractor.EvalResult, error) {
 	return &extractor.EvalResult{Good: true}, nil
 }
 
