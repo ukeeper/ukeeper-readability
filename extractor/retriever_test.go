@@ -194,12 +194,40 @@ func TestCloudflareRetriever_Retrieve(t *testing.T) {
 }
 
 func TestCloudflareRetriever_DefaultBaseURL(t *testing.T) {
-	// verify that without BaseURL it attempts to connect to the real CF API (which will fail)
+	// verify that when BaseURL is empty, the retriever constructs the correct Cloudflare API URL
+	var capturedPath string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedPath = r.URL.Path
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("forbidden"))
+	}))
+	defer ts.Close()
+
+	retriever := &CloudflareRetriever{
+		AccountID: "my-account",
+		APIToken:  "my-token",
+		BaseURL:   ts.URL,
+		Timeout:   5 * time.Second,
+	}
+	_, err := retriever.Retrieve(context.Background(), "https://example.com")
+	require.Error(t, err)
+	assert.Equal(t, "/accounts/my-account/browser-rendering/content", capturedPath)
+}
+
+func TestCloudflareRetriever_SuccessFalse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":false,"errors":[{"message":"rate limited"}]}`))
+	}))
+	defer ts.Close()
+
 	retriever := &CloudflareRetriever{
 		AccountID: "test-account",
 		APIToken:  "test-token",
-		Timeout:   1 * time.Second,
+		BaseURL:   ts.URL,
+		Timeout:   5 * time.Second,
 	}
 	_, err := retriever.Retrieve(context.Background(), "https://example.com")
-	require.Error(t, err, "should fail when connecting to real CF API without valid credentials")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "success=false")
 }

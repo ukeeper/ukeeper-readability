@@ -207,6 +207,37 @@ func TestExtractByRule(t *testing.T) {
 	})
 }
 
+func TestExtractWithCustomRetriever(t *testing.T) {
+	testHTML := `<html><head><title>Test Page</title></head>
+<body><article><p>This is the article content from a custom retriever.</p></article></body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{
+				Body:   []byte(testHTML),
+				URL:    reqURL,
+				Header: header,
+			}, nil
+		},
+	}
+
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200, Retriever: mockRetriever}
+	res, err := lr.Extract(context.Background(), "https://example.com/test-page")
+	require.NoError(t, err)
+
+	assert.Equal(t, "Test Page", res.Title)
+	assert.Equal(t, "https://example.com/test-page", res.URL)
+	assert.Equal(t, "example.com", res.Domain)
+	assert.NotEmpty(t, res.Content)
+	assert.Contains(t, res.Content, "article content from a custom retriever")
+
+	calls := mockRetriever.RetrieveCalls()
+	require.Len(t, calls, 1)
+	assert.Equal(t, "https://example.com/test-page", calls[0].URL)
+}
+
 func TestGetContentCustom(t *testing.T) {
 	rulesMock := &mocks.RulesMock{
 		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {

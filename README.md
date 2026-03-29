@@ -16,7 +16,15 @@
 | mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                                   |
 | mongo-db     | MONGO_DB        | `ureadability` | mongo database name                                   |
 | creds        | CREDS           | none           | credentials for protected calls (POST, DELETE /rules) |
+| cf-account-id| CF_ACCOUNT_ID   | none           | Cloudflare account ID for Browser Rendering API       |
+| cf-api-token | CF_API_TOKEN    | none           | Cloudflare API token with Browser Rendering Edit perm |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
+
+### Cloudflare Browser Rendering (optional)
+
+When both `--cf-account-id` and `--cf-api-token` are set, the service uses Cloudflare Browser Rendering API to fetch page content instead of direct HTTP. This renders JavaScript and handles bot-protection pages that return empty or "just a moment..." responses to standard HTTP requests.
+
+When these flags are not set, the service uses a standard HTTP client (default).
 
 ### API
 

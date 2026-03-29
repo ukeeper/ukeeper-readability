@@ -56,4 +56,4 @@ web/           → Go HTML templates (HTMX v2), static assets
 - Protected API routes use custom `basicAuth` middleware with constant-time comparison.
 - Web UI text is in Russian — tests assert on Russian strings, don't change them.
 - Middleware stack: Recoverer → RealIP → AppInfo+Ping → Throttle(50) → Logger.
-- CI runs tests and lint in the `build` job; Docker build only compiles (no tests inside Docker).
+- CI: `ci.yml` runs tests and lint in the `build` job; `docker.yml` builds Docker images via `workflow_run` trigger after `build` succeeds (no tests inside Docker).

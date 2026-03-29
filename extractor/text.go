@@ -95,7 +95,7 @@ func (f *UReadability) toUtf8(content []byte, header http.Header) (contentType, 
 		}
 		conv2utf8, err := io.ReadAll(rr)
 		if err != nil {
-			log.Printf("[WARN] convert to utf-8 failed, %b", err)
+			log.Printf("[WARN] convert to utf-8 failed, %v", err)
 			return contentType, origEncoding, result
 		}
 		result = string(conv2utf8)

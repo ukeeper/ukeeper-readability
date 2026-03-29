@@ -47,8 +47,8 @@ func (h *HTTPRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveR
 		return nil, err
 	}
 	defer func() {
-		if err = resp.Body.Close(); err != nil {
-			log.Printf("[WARN] failed to close response body, error=%v", err)
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("[WARN] failed to close response body, error=%v", closeErr)
 		}
 	}()
 
@@ -122,8 +122,8 @@ func (c *CloudflareRetriever) Retrieve(ctx context.Context, reqURL string) (*Ret
 		return nil, err
 	}
 	defer func() {
-		if err = resp.Body.Close(); err != nil {
-			log.Printf("[WARN] failed to close cf response body, error=%v", err)
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("[WARN] failed to close cf response body, error=%v", closeErr)
 		}
 	}()
 
@@ -134,19 +134,29 @@ func (c *CloudflareRetriever) Retrieve(ctx context.Context, reqURL string) (*Ret
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("cloudflare API error: status %d, body: %s", resp.StatusCode, string(body))
+		bodySnippet := body
+		if len(bodySnippet) > 512 {
+			bodySnippet = bodySnippet[:512]
+		}
+		return nil, fmt.Errorf("cloudflare API error: status %d, body: %s", resp.StatusCode, string(bodySnippet))
 	}
 
 	// try JSON response format first: {"success": true, "result": "<html>"}
 	var cfResp cfResponse
-	if err = json.Unmarshal(body, &cfResp); err == nil && cfResp.Success && cfResp.Result != "" {
-		body = []byte(cfResp.Result)
+	if err = json.Unmarshal(body, &cfResp); err == nil {
+		if cfResp.Success && cfResp.Result != "" {
+			body = []byte(cfResp.Result)
+		} else if !cfResp.Success {
+			return nil, fmt.Errorf("cloudflare API returned success=false for %s", reqURL)
+		}
 	}
-	// otherwise use the raw body as-is (raw HTML response)
+	// if unmarshal fails, use the raw body as-is (raw HTML response)
 
 	header := make(http.Header)
 	header.Set("Content-Type", "text/html; charset=utf-8")
 
+	// note: URL is the original request URL, not the final URL after any JS-driven redirects,
+	// because the Cloudflare Browser Rendering /content API does not expose the final navigated URL
 	return &RetrieveResult{
 		Body:   body,
 		URL:    reqURL,
