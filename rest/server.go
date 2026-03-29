@@ -87,6 +87,7 @@ func (s *Server) routes(frontendDir string) http.Handler {
 			protectedGroup.HandleFunc("POST /rule", s.saveRule)
 			protectedGroup.HandleFunc("POST /toggle-rule/{id}", s.toggleRule)
 			protectedGroup.HandleFunc("POST /preview", s.handlePreview)
+			protectedGroup.HandleFunc("GET /content-parsed-wrong", s.contentParsedWrong)
 		})
 	})
 
@@ -409,6 +410,27 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		"version": s.Version,
 		"time":    time.Now().Format(time.RFC3339),
 	})
+}
+
+func (s *Server) contentParsedWrong(w http.ResponseWriter, r *http.Request) {
+	if s.Readability.OpenAIKey == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "OpenAI key is not set")
+		return
+	}
+
+	exampleURL := r.URL.Query().Get("url")
+	if exampleURL == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "url parameter is required")
+		return
+	}
+
+	message, err := s.Readability.ContentParsedWrong(r.Context(), exampleURL)
+	if err != nil {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, err.Error())
+		return
+	}
+
+	rest.RenderJSON(w, JSON{"message": message})
 }
 
 func getBid(id string) bson.ObjectID {

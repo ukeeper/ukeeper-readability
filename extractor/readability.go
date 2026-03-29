@@ -398,6 +398,114 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	return rb, nil
 }
 
+// ContentParsedWrong asks ChatGPT for a CSS selector to extract content from the URL,
+// compares the result with the current extraction, and saves a new rule if different.
+func (f *UReadability) ContentParsedWrong(ctx context.Context, urlStr string) (string, error) {
+	originalContent, err := f.Extract(ctx, urlStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract content: %w", err)
+	}
+
+	selector, err := f.getChatGPTSelector(ctx, urlStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to get CSS selector: %w", err)
+	}
+
+	body, err := f.getHTMLBody(ctx, urlStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to get HTML body: %w", err)
+	}
+
+	newContent, err := f.extractContentWithSelector(body, selector)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract content with new selector: %w", err)
+	}
+
+	if strings.TrimSpace(originalContent.Content) != strings.TrimSpace(newContent) {
+		rule := datastore.Rule{
+			Domain:   extractDomain(urlStr),
+			Content:  selector,
+			TestURLs: []string{urlStr},
+			Enabled:  true,
+		}
+
+		if _, err = f.Rules.Save(ctx, rule); err != nil {
+			return "", fmt.Errorf("failed to save new rule: %w", err)
+		}
+
+		return fmt.Sprintf("new custom rule with DOM %s created", selector), nil
+	}
+
+	return "default rule is good, no need to create the custom one", nil
+}
+
+func (f *UReadability) getChatGPTSelector(ctx context.Context, urlStr string) (string, error) {
+	client := openai.NewClient(f.OpenAIKey)
+	resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: openai.GPT4o,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "You are a helpful assistant that provides CSS selectors for extracting main content from web pages.",
+			},
+			{
+				Role: openai.ChatMessageRoleUser,
+				Content: fmt.Sprintf("Given the URL %s, identify the CSS selector that can be used to extract the main content "+
+					"of the article. This typically includes elements like 'article', 'main', or specific classes. "+
+					"Return only this selector and nothing else.", urlStr),
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", errors.New("no response from OpenAI")
+	}
+	return resp.Choices[0].Message.Content, nil
+}
+
+// getHTMLBody fetches page HTML for re-extraction with a new selector
+func (f *UReadability) getHTMLBody(ctx context.Context, urlStr string) (string, error) {
+	httpClient := &http.Client{Timeout: f.TimeOut}
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, http.NoBody)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("[WARN] failed to close response body, error=%v", closeErr)
+		}
+	}()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+func (f *UReadability) extractContentWithSelector(body, selector string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	return doc.Find(selector).Text(), nil
+}
+
+func extractDomain(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
 // getContent retrieves content from raw body string, both content (text only) and rich (with html tags)
 // if rule is provided, it uses custom rule, otherwise tries to retrieve one from the storage,
 // and at last tries to use general readability parser
