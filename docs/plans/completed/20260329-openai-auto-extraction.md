@@ -118,9 +118,9 @@
 
 ### Task 7: [Final] Update documentation
 
-- [ ] update README.md with OpenAI configuration flags
-- [ ] update CLAUDE.md with new AIEvaluator interface and extraction flow
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update README.md with OpenAI configuration flags
+- [x] update CLAUDE.md with new AIEvaluator interface and extraction flow
+- [x] move this plan to `docs/plans/completed/`
 
 ## Technical Details
 

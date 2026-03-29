@@ -18,6 +18,9 @@
 | creds        | CREDS           | none           | credentials for protected calls (POST, DELETE /rules) |
 | cf-account-id| CF_ACCOUNT_ID   | none           | Cloudflare account ID for Browser Rendering API       |
 | cf-api-token | CF_API_TOKEN    | none           | Cloudflare API token with Browser Rendering Edit perm |
+| openai-api-key | OPENAI_API_KEY | none          | OpenAI API key; enables auto-evaluation when set      |
+| openai-model | OPENAI_MODEL    | `gpt-5.4-mini` | OpenAI model for evaluation                           |
+| openai-max-iter | OPENAI_MAX_ITER | `3`         | max evaluation iterations per extraction               |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
 
 ### Cloudflare Browser Rendering (optional)
@@ -25,6 +28,18 @@
 When both `--cf-account-id` and `--cf-api-token` are set, the service uses Cloudflare Browser Rendering API to fetch page content instead of direct HTTP. This renders JavaScript and handles bot-protection pages that return empty or "just a moment..." responses to standard HTTP requests.
 
 When these flags are not set, the service uses a standard HTTP client (default).
+
+### OpenAI Auto-Evaluation (optional)
+
+When `--openai-api-key` is set, the service automatically evaluates extraction quality using OpenAI. If the extracted content looks poor (missing article body, too short, mostly boilerplate), GPT suggests a CSS selector targeting the main content. The service iterates up to `--openai-max-iter` times, saving the best selector as a rule for future use.
+
+Evaluation only runs for domains without an existing extraction rule. For domains that already have rules, use the force-mode endpoint to re-evaluate:
+
+    GET /api/content-parsed-wrong?url=http://example.com/article
+
+This protected endpoint (requires basicAuth credentials) ignores the stored rule, re-extracts with the general parser, and runs the evaluation loop to find a better selector.
+
+When OpenAI is not configured, extraction works exactly as before — no GPT calls are made.
 
 ### API
 
