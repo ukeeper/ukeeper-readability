@@ -80,12 +80,12 @@
 **Files:**
 - Modify: `main.go`
 
-- [ ] add `OpenAIKey string` field (`--openai-api-key` / `OPENAI_API_KEY`)
-- [ ] add `OpenAIModel string` field (`--openai-model` / `OPENAI_MODEL` default `gpt-5.4-mini`)
-- [ ] add `MaxGPTIter int` field (`--openai-max-iter` / `OPENAI_MAX_ITER` default `3`)
-- [ ] when `OpenAIKey` is set, create `OpenAIEvaluator` and inject into `UReadability`
-- [ ] log which mode is active (with/without OpenAI evaluation)
-- [ ] run tests — must pass before next task
+- [x] add `OpenAIKey string` field (`--openai-api-key` / `OPENAI_API_KEY`)
+- [x] add `OpenAIModel string` field (`--openai-model` / `OPENAI_MODEL` default `gpt-5.4-mini`)
+- [x] add `MaxGPTIter int` field (`--openai-max-iter` / `OPENAI_MAX_ITER` default `3`)
+- [x] when `OpenAIKey` is set, create `OpenAIEvaluator` and inject into `UReadability`
+- [x] log which mode is active (with/without OpenAI evaluation)
+- [x] run tests — must pass before next task
 
 ### Task 4: Add REST endpoint for force mode
 
