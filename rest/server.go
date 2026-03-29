@@ -54,7 +54,9 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 	go func() {
 		// shutdown on context cancellation
 		<-ctx.Done()
-		if err := httpServer.Shutdown(ctx); err != nil {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			log.Printf("[DEBUG] http shutdown error, %s", err)
 		}
 		log.Print("[DEBUG] http server shutdown completed")
