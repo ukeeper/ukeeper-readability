@@ -99,10 +99,10 @@
 
 ### Task 6: Verify acceptance criteria
 
-- [ ] verify `UReadability{}` without `Retriever` field works (backward compatible)
-- [ ] verify `UReadability{Retriever: &CloudflareRetriever{...}}` works
-- [ ] verify all existing tests pass: `go test -timeout=60s -race ./...`
-- [ ] verify mock is generated and up to date
+- [x] verify `UReadability{}` without `Retriever` field works (backward compatible)
+- [x] verify `UReadability{Retriever: &CloudflareRetriever{...}}` works
+- [x] verify all existing tests pass: `go test -timeout=60s -race ./...`
+- [x] verify mock is generated and up to date
 
 ### Task 7: [Final] Update documentation
 
