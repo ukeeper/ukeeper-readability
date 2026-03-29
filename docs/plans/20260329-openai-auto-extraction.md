@@ -100,11 +100,11 @@
 
 ### Task 5: Run linter and final checks
 
-- [ ] run `gofmt -w` on all modified files
-- [ ] run `go fix ./...`
-- [ ] run `golangci-lint run --max-issues-per-linter=0 --max-same-issues=0`
-- [ ] fix any lint issues
-- [ ] run tests — must pass before next task
+- [x] run `gofmt -w` on all modified files
+- [x] run `go fix ./...`
+- [x] run `golangci-lint run --max-issues-per-linter=0 --max-same-issues=0`
+- [x] fix any lint issues
+- [x] run tests — must pass before next task
 
 ### Task 6: Verify acceptance criteria
 
