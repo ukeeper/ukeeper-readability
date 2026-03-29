@@ -12,7 +12,7 @@ import (
 	log "github.com/go-pkgz/lgr"
 )
 
-//go:generate moq -out mocks/retriever.go -pkg mocks -skip-ensure -fmt goimports . Retriever
+//go:generate moq -out retriever_mock_test.go -skip-ensure -fmt goimports . Retriever
 
 // Retriever abstracts how page content is fetched from a URL
 type Retriever interface {

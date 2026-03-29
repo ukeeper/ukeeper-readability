@@ -90,12 +90,12 @@
 ### Task 5: Generate mock and run linter
 
 **Files:**
-- Create: `extractor/mocks/retriever.go` (generated)
+- Create: `extractor/retriever_mock_test.go` (generated, test-only — placed in extractor package to avoid import cycle with mocks/)
 
-- [ ] run `go generate ./extractor/...` to generate `Retriever` mock
-- [ ] run `gofmt -w` on all modified files
-- [ ] run `golangci-lint run --max-issues-per-linter=0 --max-same-issues=0`
-- [ ] fix any lint issues
+- [x] run `go generate ./extractor/...` to generate `Retriever` mock
+- [x] run `gofmt -w` on all modified files
+- [x] run `golangci-lint run --max-issues-per-linter=0 --max-same-issues=0`
+- [x] fix any lint issues
 
 ### Task 6: Verify acceptance criteria
 
