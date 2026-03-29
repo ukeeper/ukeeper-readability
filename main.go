@@ -62,6 +62,7 @@ func main() {
 		if opts.CFAccountID != "" || opts.CFAPIToken != "" {
 			log.Print("[WARN] both --cf-account-id and --cf-api-token must be set for Cloudflare Browser Rendering; falling back to default HTTP retriever")
 		}
+		retriever = &extractor.HTTPRetriever{Timeout: 30 * time.Second}
 		log.Print("[INFO] using default HTTP retriever")
 	}
 
