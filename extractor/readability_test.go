@@ -149,13 +149,13 @@ func TestNormalizeLinks(t *testing.T) {
 	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	inp := `blah <img src="/aaa.png"/> sdfasd <a href="/blah2/aa.link">something</a> blah33 <img src="//aaa.com/xyz.jpg">xx</img>`
 	u, _ := url.Parse("http://ukeeper.com/blah")
-	out, links := lr.normalizeLinks(inp, &http.Request{URL: u})
+	out, links := lr.normalizeLinks(inp, u)
 	assert.Equal(t, `blah <img src="http://ukeeper.com/aaa.png"/> sdfasd <a href="http://ukeeper.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
 	assert.Len(t, links, 3)
 
 	inp = `<body>
 		<img class="alignright size-full wp-image-944214 lazyloadableImage lazyLoad-fadeIn" alt="View Page Source" width="308" height="508" data-original="http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg" src="http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg"></body>`
-	_, links = lr.normalizeLinks(inp, &http.Request{URL: u})
+	_, links = lr.normalizeLinks(inp, u)
 	assert.Len(t, links, 1)
 	assert.Equal(t, "http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg", links[0])
 }

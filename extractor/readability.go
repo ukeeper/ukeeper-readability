@@ -4,8 +4,6 @@ package extractor
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -35,6 +33,15 @@ type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Rules       Rules
+	Retriever   Retriever
+}
+
+// retriever returns the configured Retriever, defaulting to HTTPRetriever if nil
+func (f *UReadability) retriever() Retriever {
+	if f.Retriever != nil {
+		return f.Retriever
+	}
+	return &HTTPRetriever{Timeout: f.TimeOut}
 }
 
 // Response from api calls
@@ -77,36 +84,15 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	log.Printf("[INFO] extract %s", reqURL)
 	rb := &Response{}
 
-	httpClient := &http.Client{Timeout: f.TimeOut}
-	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
+	result, err := f.retriever().Retrieve(ctx, reqURL)
 	if err != nil {
-		log.Printf("[WARN] failed to create request for %s, error=%v", reqURL, err)
 		return nil, err
 	}
-	req.Close = true
-	req.Header.Set("User-Agent", userAgent)
-	resp, err := httpClient.Do(req)
 
-	if err != nil {
-		log.Printf("[WARN] failed to get anything from %s, error=%v", reqURL, err)
-		return nil, err
-	}
-	defer func() {
-		if err = resp.Body.Close(); err != nil {
-			log.Printf("[WARN] failed to close response body, error=%v", err)
-		}
-	}()
-
-	rb.URL = resp.Request.URL.String()
-	dataBytes, e := io.ReadAll(resp.Body)
-
-	if e != nil {
-		log.Printf("[WARN] failed to read data from %s, error=%v", reqURL, e)
-		return nil, e
-	}
+	rb.URL = result.URL
 
 	var body string
-	rb.ContentType, rb.Charset, body = f.toUtf8(dataBytes, resp.Header)
+	rb.ContentType, rb.Charset, body = f.toUtf8(result.Body, result.Header)
 	rb.Content, rb.Rich, err = f.getContent(ctx, body, reqURL, rule)
 	if err != nil {
 		log.Printf("[WARN] failed to parse %s, error=%v", reqURL, err)
@@ -120,12 +106,14 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 
 	rb.Title = dbody.Find("title").First().Text()
 
-	if r, e := url.Parse(rb.URL); e == nil {
-		rb.Domain = r.Host
+	finalURL, err := url.Parse(rb.URL)
+	if err != nil {
+		return nil, fmt.Errorf("parse final URL %q: %w", rb.URL, err)
 	}
+	rb.Domain = finalURL.Host
 
 	rb.Content = f.getText(rb.Content, rb.Title)
-	rb.Rich, rb.AllLinks = f.normalizeLinks(rb.Rich, resp.Request)
+	rb.Rich, rb.AllLinks = f.normalizeLinks(rb.Rich, finalURL)
 	rb.Excerpt = f.getSnippet(rb.Content)
 	darticle, err := goquery.NewDocumentFromReader(strings.NewReader(rb.Rich))
 	if err != nil {
@@ -196,9 +184,9 @@ func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule
 }
 
 // makes all links absolute and returns all found links
-func (f *UReadability) normalizeLinks(data string, reqContext *http.Request) (result string, links []string) {
+func (f *UReadability) normalizeLinks(data string, baseURL *url.URL) (result string, links []string) {
 	absoluteLink := func(link string) (absLink string, changed bool) {
-		if r, err := reqContext.URL.Parse(link); err == nil {
+		if r, err := baseURL.Parse(link); err == nil {
 			return r.String(), r.String() != link
 		}
 		return "", false

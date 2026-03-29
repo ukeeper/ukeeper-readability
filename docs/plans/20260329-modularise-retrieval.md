@@ -67,15 +67,15 @@
 - Modify: `extractor/readability.go`
 - Modify: `extractor/readability_test.go`
 
-- [ ] add `Retriever Retriever` field to `UReadability` struct
-- [ ] add `retriever()` helper method: returns `f.Retriever` if non-nil, otherwise `&HTTPRetriever{Timeout: f.TimeOut}`
-- [ ] replace inline HTTP fetch in `extractWithRules` (lines 80-106) with `f.retriever().Retrieve(ctx, reqURL)` call
-- [ ] use `result.URL`, `result.Body`, `result.Header` instead of `resp.Request.URL`, `io.ReadAll(resp.Body)`, `resp.Header`
-- [ ] change `normalizeLinks` signature from `*http.Request` to `*url.URL` (only `.URL` field is used); update caller to pass parsed URL
-- [ ] remove unused imports from `readability.go` (`io`, `net/http`)
-- [ ] update `TestNormalizeLinks` and `TestNormalizeLinksIssue` to pass `*url.URL` instead of `&http.Request{URL: u}`
-- [ ] verify all existing tests pass unchanged (tests create `UReadability` without `Retriever` — nil defaults to HTTPRetriever)
-- [ ] run full test suite: `go test -timeout=60s -race ./...`
+- [x] add `Retriever Retriever` field to `UReadability` struct
+- [x] add `retriever()` helper method: returns `f.Retriever` if non-nil, otherwise `&HTTPRetriever{Timeout: f.TimeOut}`
+- [x] replace inline HTTP fetch in `extractWithRules` (lines 80-106) with `f.retriever().Retrieve(ctx, reqURL)` call
+- [x] use `result.URL`, `result.Body`, `result.Header` instead of `resp.Request.URL`, `io.ReadAll(resp.Body)`, `resp.Header`
+- [x] change `normalizeLinks` signature from `*http.Request` to `*url.URL` (only `.URL` field is used); update caller to pass parsed URL
+- [x] remove unused imports from `readability.go` (`io`, `net/http`)
+- [x] update `TestNormalizeLinks` and `TestNormalizeLinksIssue` to pass `*url.URL` instead of `&http.Request{URL: u}`
+- [x] verify all existing tests pass unchanged (tests create `UReadability` without `Retriever` — nil defaults to HTTPRetriever)
+- [x] run full test suite: `go test -timeout=60s -race ./...`
 
 ### Task 4: Add CLI flags and wiring in main.go
 
