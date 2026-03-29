@@ -193,8 +193,8 @@ func TestCloudflareRetriever_Retrieve(t *testing.T) {
 	}
 }
 
-func TestCloudflareRetriever_DefaultBaseURL(t *testing.T) {
-	// verify that when BaseURL is empty, the retriever constructs the correct Cloudflare API URL
+func TestCloudflareRetriever_URLPathConstruction(t *testing.T) {
+	// verify that the retriever constructs the correct Cloudflare API URL path from AccountID
 	var capturedPath string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedPath = r.URL.Path
