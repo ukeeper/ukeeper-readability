@@ -26,6 +26,10 @@ func TestExtractURL(t *testing.T) {
 		}
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			w.Header().Set("Content-Type", "text/html; charset=windows-1251") // test non-standard charset decoding
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
@@ -105,6 +109,10 @@ func TestExtractGeneral(t *testing.T) {
 		}
 		if r.URL.String() == "/p/2015/11/22/podcast-369/" {
 			fh, err := os.Open("testdata/podcast-369.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -114,6 +122,10 @@ func TestExtractGeneral(t *testing.T) {
 		}
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -124,13 +136,16 @@ func TestExtractGeneral(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
 	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	a, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	require.NoError(t, err)
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", a.Title)
 	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", a.URL)
 	assert.Equal(t, "Не первый раз я практикую идею “а давайте, ребята, сделаем для общего блага …”, и вот опять. В нашем подкасте радио-т есть незаменимый инструмент, позволяющий собирать новости, готовить их к выпуску, ...", a.Excerpt)
-	assert.Contains(t, ts.URL, a.Domain)
+	assert.Equal(t, tsURL.Host, a.Domain)
 
 	a, err = lr.Extract(context.Background(), ts.URL+"/v48b6Q")
 	require.NoError(t, err)
@@ -138,7 +153,7 @@ func TestExtractGeneral(t *testing.T) {
 	assert.Equal(t, ts.URL+"/p/2015/11/22/podcast-369/", a.URL)
 	assert.Equal(t, "2015-11-22 Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по будкам …Отбиваюсь от опасных ...", a.Excerpt)
 	assert.Equal(t, "https://podcast.umputun.com/images/uwp/uwp369.jpg", a.Image)
-	assert.Contains(t, ts.URL, a.Domain)
+	assert.Equal(t, tsURL.Host, a.Domain)
 	assert.Len(t, a.AllLinks, 13)
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/media/ump_podcast369.mp3")
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/images/uwp/uwp369.jpg")
@@ -170,6 +185,10 @@ func TestExtractByRule(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
 			fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -249,6 +268,10 @@ func TestGetContentCustom(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
 			fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())

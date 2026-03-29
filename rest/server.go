@@ -152,13 +152,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
-	token := r.URL.Query().Get("token")
-	if s.Token != "" && token == "" {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
-		return
-	}
-	if s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(token)) == 0 {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
+	if !s.checkToken(w, r) {
 		return
 	}
 
@@ -185,15 +179,7 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 // extractArticleEmulateReadability emulates readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
-	token := r.URL.Query().Get("token")
-
-	if s.Token != "" && token == "" {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
-		return
-	}
-
-	if s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(token)) == 0 {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
+	if !s.checkToken(w, r) {
 		return
 	}
 
@@ -361,6 +347,21 @@ func getBid(id string) bson.ObjectID {
 		return bson.NilObjectID
 	}
 	return bid
+}
+
+// checkToken validates the token query parameter if the server has a token configured.
+// returns true if auth passed, false if the request was rejected.
+func (s *Server) checkToken(w http.ResponseWriter, r *http.Request) bool {
+	token := r.URL.Query().Get("token")
+	if s.Token != "" && token == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
+		return false
+	}
+	if s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(token)) == 0 {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
+		return false
+	}
+	return true
 }
 
 // basicAuth returns a piece of middleware that will allow access only

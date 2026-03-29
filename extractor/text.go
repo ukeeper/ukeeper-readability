@@ -2,9 +2,10 @@ package extractor
 
 import (
 	"io"
-	"log"
 	"net/http"
 	"strings"
+
+	log "github.com/go-pkgz/lgr"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/kennygrant/sanitize"

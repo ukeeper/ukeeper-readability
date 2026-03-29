@@ -12,7 +12,7 @@
 | port         | UKEEPER_PORT    | `8080`         | web server port                                       |
 | mongo-uri    | MONGO_URI       | none           | MongoDB connection string, _required_                 |
 | frontend-dir | FRONTEND_DIR    | `/srv/web`     | directory with frontend files                         |
-| token        | TOKEN           | none           | token for /content/v1/parser endpoint auth            |
+| token        | UKEEPER_TOKEN   | none           | token for API endpoint auth                           |
 | mongo-delay  | MONGO_DELAY     | `0`            | mongo initial delay                                   |
 | mongo-db     | MONGO_DB        | `ureadability` | mongo database name                                   |
 | creds        | CREDS           | none           | credentials for protected calls (POST, DELETE /rules) |
@@ -29,7 +29,7 @@ When these flags are not set, the service uses a standard HTTP client (default).
 ### API
 
     GET /api/content/v1/parser?token=secret&url=http://aa.com/blah - extract content (emulate Readability API parse call)
-    POST /api/v1/extract {url: http://aa.com/blah}  - extract content
+    POST /api/extract?token=secret {url: http://aa.com/blah}  - extract content
 
 ## Development
 

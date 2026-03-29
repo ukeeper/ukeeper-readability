@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	log "github.com/go-pkgz/lgr"
@@ -29,19 +30,27 @@ type RetrieveResult struct {
 // HTTPRetriever fetches pages using a standard HTTP client
 type HTTPRetriever struct {
 	Timeout time.Duration
+
+	once   sync.Once
+	client *http.Client
+}
+
+func (h *HTTPRetriever) httpClient() *http.Client {
+	h.once.Do(func() {
+		h.client = &http.Client{Timeout: h.Timeout}
+	})
+	return h.client
 }
 
 // Retrieve fetches the URL using an HTTP GET with Safari user-agent, following redirects
 func (h *HTTPRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveResult, error) {
-	httpClient := &http.Client{Timeout: h.Timeout}
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, http.NoBody)
 	if err != nil {
 		log.Printf("[WARN] failed to create request for %s, error=%v", reqURL, err)
 		return nil, err
 	}
-	req.Close = true
 	req.Header.Set("User-Agent", userAgent)
-	resp, err := httpClient.Do(req)
+	resp, err := h.httpClient().Do(req)
 	if err != nil {
 		log.Printf("[WARN] failed to get anything from %s, error=%v", reqURL, err)
 		return nil, err
@@ -72,6 +81,16 @@ type CloudflareRetriever struct {
 	APIToken  string
 	BaseURL   string // override for testing; defaults to Cloudflare API
 	Timeout   time.Duration
+
+	once   sync.Once
+	client *http.Client
+}
+
+func (c *CloudflareRetriever) httpClient() *http.Client {
+	c.once.Do(func() {
+		c.client = &http.Client{Timeout: c.Timeout}
+	})
+	return c.client
 }
 
 // cfRequest is the request body for the Cloudflare Browser Rendering /content endpoint
@@ -115,8 +134,7 @@ func (c *CloudflareRetriever) Retrieve(ctx context.Context, reqURL string) (*Ret
 	httpReq.Header.Set("Authorization", "Bearer "+c.APIToken)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	httpClient := &http.Client{Timeout: c.Timeout}
-	resp, err := httpClient.Do(httpReq)
+	resp, err := c.httpClient().Do(httpReq)
 	if err != nil {
 		log.Printf("[WARN] cloudflare request failed for %s, error=%v", reqURL, err)
 		return nil, err
