@@ -48,6 +48,7 @@ jobs:
           password: ${{ secrets.PKG_TOKEN }}
 
       - name: login to DockerHub
+        continue-on-error: true
         uses: docker/login-action@v4
         with:
           username: ${{ github.actor }}
@@ -67,6 +68,7 @@ jobs:
 
       - name: build and push to DockerHub by digest
         id: build-dockerhub
+        continue-on-error: true
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -77,13 +79,19 @@ jobs:
             GIT_BRANCH=${{ github.event.workflow_run.head_branch }}
           outputs: type=image,name=umputun/ukeeper-readability,push-by-digest=true,name-canonical=true,push=true
 
-      - name: export digests
+      - name: export ghcr digest
         env:
           DIGEST_GHCR: ${{ steps.build-ghcr.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests/ghcr
+          touch "/tmp/digests/ghcr/${DIGEST_GHCR#sha256:}"
+
+      - name: export dockerhub digest
+        if: steps.build-dockerhub.outcome == 'success'
+        env:
           DIGEST_DOCKERHUB: ${{ steps.build-dockerhub.outputs.digest }}
         run: |
-          mkdir -p /tmp/digests/ghcr /tmp/digests/dockerhub
-          touch "/tmp/digests/ghcr/${DIGEST_GHCR#sha256:}"
+          mkdir -p /tmp/digests/dockerhub
           touch "/tmp/digests/dockerhub/${DIGEST_DOCKERHUB#sha256:}"
 
       - name: upload ghcr digest
@@ -94,6 +102,7 @@ jobs:
           retention-days: 1
 
       - name: upload dockerhub digest
+        if: steps.build-dockerhub.outcome == 'success'
         uses: actions/upload-artifact@v7
         with:
           name: digests-dockerhub-${{ matrix.artifact }}
@@ -116,24 +125,41 @@ jobs:
           merge-multiple: true
 
       - name: download dockerhub digests
+        id: download-dockerhub
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
           path: /tmp/digests/dockerhub
           pattern: digests-dockerhub-*
           merge-multiple: true
 
-      - name: verify all digests present
+      - name: verify ghcr digests present
         run: |
-          for registry in ghcr dockerhub; do
-            expected=2
-            actual=$(find /tmp/digests/$registry -maxdepth 1 -type f | wc -l)
-            if [ "$actual" -ne "$expected" ]; then
-              echo "Expected $expected digests for $registry, found $actual"
-              ls -la /tmp/digests/$registry
-              exit 1
-            fi
-          done
-          echo "All digests present"
+          expected=2
+          actual=$(find /tmp/digests/ghcr -maxdepth 1 -type f | wc -l)
+          if [ "$actual" -ne "$expected" ]; then
+            echo "Expected $expected digests for ghcr, found $actual"
+            ls -la /tmp/digests/ghcr
+            exit 1
+          fi
+          echo "All ghcr digests present"
+
+      - name: verify dockerhub digests present
+        id: verify-dockerhub
+        continue-on-error: true
+        run: |
+          if [ ! -d /tmp/digests/dockerhub ]; then
+            echo "No dockerhub digests directory, skipping"
+            exit 1
+          fi
+          expected=2
+          actual=$(find /tmp/digests/dockerhub -maxdepth 1 -type f | wc -l)
+          if [ "$actual" -ne "$expected" ]; then
+            echo "Expected $expected digests for dockerhub, found $actual"
+            ls -la /tmp/digests/dockerhub
+            exit 1
+          fi
+          echo "All dockerhub digests present"
 
       - name: set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -146,6 +172,8 @@ jobs:
           password: ${{ secrets.PKG_TOKEN }}
 
       - name: login to DockerHub
+        if: steps.verify-dockerhub.outcome == 'success'
+        continue-on-error: true
         uses: docker/login-action@v4
         with:
           username: ${{ github.actor }}
@@ -178,6 +206,8 @@ jobs:
             $(printf 'ghcr.io/ukeeper/ukeeper-readability@sha256:%s ' *)
 
       - name: create DockerHub manifest and push
+        if: steps.verify-dockerhub.outcome == 'success'
+        continue-on-error: true
         working-directory: /tmp/digests/dockerhub
         env:
           REF: ${{ steps.tags.outputs.ref }}
