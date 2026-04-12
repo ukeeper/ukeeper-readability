@@ -41,6 +41,14 @@
       </div>
       <div class="row rule__row">
         <div class="row__col rule__col">
+          <label class="form__tip">
+            <input type="checkbox" name="use_cloudflare" value="true"{{if .UseCloudflare}} checked{{end}}>
+            Загружать через Cloudflare Browser Rendering
+          </label>
+        </div>
+      </div>
+      <div class="row rule__row">
+        <div class="row__col rule__col">
           <button type="submit" class="form__button rule__button-save">Сохранить</button>
         </div>
         <div class="row__col rule__col">

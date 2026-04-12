@@ -114,6 +114,10 @@ func TestServer_Extract(t *testing.T) {
 	tss := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -177,6 +181,10 @@ func TestServer_LegacyExtract(t *testing.T) {
 	tss := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -533,6 +541,10 @@ func TestServer_Preview(t *testing.T) {
 	tss := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("../extractor/testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())

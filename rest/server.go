@@ -48,8 +48,14 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 		Addr:              fmt.Sprintf("%s:%d", address, port),
 		Handler:           s.routes(frontendDir),
 		ReadHeaderTimeout: 5 * time.Second,
-		// WriteTimeout:      120 * time.Second, // TODO: such a long timeout needed for blocking export (backup) request
-		IdleTimeout: 30 * time.Second,
+		// WriteTimeout is server-wide rather than per-route because the extraction endpoints
+		// are the only potentially long-running handlers (other handlers — static files, rule
+		// CRUD, /ping — finish in milliseconds and are unaffected by this ceiling). 150s covers
+		// the worst-case Cloudflare path: 1 initial request + 2 retries with 11s/22s exponential
+		// backoff + up to 30s per CF request. If extraction ever moves off the server-wide
+		// timeout, wrap only those routes with http.TimeoutHandler instead.
+		WriteTimeout: 150 * time.Second,
+		IdleTimeout:  30 * time.Second,
 	}
 	go func() {
 		// shutdown on context cancellation
@@ -175,15 +181,7 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 // extractArticleEmulateReadability emulates readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
-	token := r.URL.Query().Get("token")
-
-	if s.Token != "" && token == "" {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
-		return
-	}
-
-	if s.Token != "" && s.Token != token {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
+	if !s.checkToken(w, r) {
 		return
 	}
 
@@ -283,14 +281,15 @@ func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rule := datastore.Rule{
-		Enabled:   true,
-		ID:        getBid(r.FormValue("id")),
-		Domain:    r.FormValue("domain"),
-		Author:    r.FormValue("author"),
-		Content:   r.FormValue("content"),
-		MatchURLs: strings.Split(r.FormValue("match_url"), "\n"),
-		Excludes:  strings.Split(r.FormValue("excludes"), "\n"),
-		TestURLs:  strings.Split(r.FormValue("test_urls"), "\n"),
+		Enabled:       true,
+		ID:            getBid(r.FormValue("id")),
+		Domain:        r.FormValue("domain"),
+		Author:        r.FormValue("author"),
+		Content:       r.FormValue("content"),
+		MatchURLs:     strings.Split(r.FormValue("match_url"), "\n"),
+		Excludes:      strings.Split(r.FormValue("excludes"), "\n"),
+		TestURLs:      strings.Split(r.FormValue("test_urls"), "\n"),
+		UseCloudflare: r.FormValue("use_cloudflare") == "true",
 	}
 
 	// return error in case domain is not set
@@ -351,6 +350,21 @@ func getBid(id string) bson.ObjectID {
 		return bson.NilObjectID
 	}
 	return bid
+}
+
+// checkToken validates the token query parameter if the server has a token configured.
+// returns true if auth passed, false if the request was rejected.
+func (s *Server) checkToken(w http.ResponseWriter, r *http.Request) bool {
+	token := r.URL.Query().Get("token")
+	if s.Token != "" && token == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
+		return false
+	}
+	if s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(token)) == 0 {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
+		return false
+	}
+	return true
 }
 
 // basicAuth returns a piece of middleware that will allow access only

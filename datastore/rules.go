@@ -18,16 +18,17 @@ type RulesDAO struct {
 
 // Rule record, entry in mongo
 type Rule struct {
-	ID        bson.ObjectID `json:"id" bson:"_id,omitempty"`
-	Domain    string        `json:"domain"`
-	MatchURLs []string      `json:"match_url,omitempty" bson:"match_urls,omitempty"`
-	Content   string        `json:"content"`
-	Author    string        `json:"author,omitempty" bson:"author,omitempty"`
-	TS        string        `json:"ts,omitempty" bson:"ts,omitempty"` // ts of original article
-	Excludes  []string      `json:"excludes,omitempty" bson:"excludes,omitempty"`
-	TestURLs  []string      `json:"test_urls,omitempty" bson:"test_urls"`
-	User      string        `json:"user"`
-	Enabled   bool          `json:"enabled"`
+	ID            bson.ObjectID `json:"id" bson:"_id,omitempty"`
+	Domain        string        `json:"domain"`
+	MatchURLs     []string      `json:"match_url,omitempty" bson:"match_urls,omitempty"`
+	Content       string        `json:"content"`
+	Author        string        `json:"author,omitempty" bson:"author,omitempty"`
+	TS            string        `json:"ts,omitempty" bson:"ts,omitempty"` // ts of original article
+	Excludes      []string      `json:"excludes,omitempty" bson:"excludes,omitempty"`
+	TestURLs      []string      `json:"test_urls,omitempty" bson:"test_urls"`
+	User          string        `json:"user"`
+	Enabled       bool          `json:"enabled"`
+	UseCloudflare bool          `json:"use_cloudflare,omitempty" bson:"use_cloudflare,omitempty"` // route fetch via Cloudflare Browser Rendering
 }
 
 // Get rule by url. Checks if found in mongo, matching by domain

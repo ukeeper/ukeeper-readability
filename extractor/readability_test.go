@@ -26,6 +26,10 @@ func TestExtractURL(t *testing.T) {
 		}
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			w.Header().Set("Content-Type", "text/html; charset=windows-1251") // test non-standard charset decoding
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
@@ -105,6 +109,10 @@ func TestExtractGeneral(t *testing.T) {
 		}
 		if r.URL.String() == "/p/2015/11/22/podcast-369/" {
 			fh, err := os.Open("testdata/podcast-369.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -114,6 +122,10 @@ func TestExtractGeneral(t *testing.T) {
 		}
 		if r.URL.String() == "/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/" {
 			fh, err := os.Open("testdata/vsiem-mirom-dlia-obshchiei-polzy.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -124,13 +136,16 @@ func TestExtractGeneral(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	tsURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+
 	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	a, err := lr.Extract(context.Background(), ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/")
 	require.NoError(t, err)
 	assert.Equal(t, "Всем миром для общей пользы • Umputun тут был", a.Title)
 	assert.Equal(t, ts.URL+"/2015/11/26/vsiem-mirom-dlia-obshchiei-polzy/", a.URL)
 	assert.Equal(t, "Не первый раз я практикую идею “а давайте, ребята, сделаем для общего блага …”, и вот опять. В нашем подкасте радио-т есть незаменимый инструмент, позволяющий собирать новости, готовить их к выпуску, ...", a.Excerpt)
-	assert.Contains(t, ts.URL, a.Domain)
+	assert.Equal(t, tsURL.Host, a.Domain)
 
 	a, err = lr.Extract(context.Background(), ts.URL+"/v48b6Q")
 	require.NoError(t, err)
@@ -138,7 +153,7 @@ func TestExtractGeneral(t *testing.T) {
 	assert.Equal(t, ts.URL+"/p/2015/11/22/podcast-369/", a.URL)
 	assert.Equal(t, "2015-11-22 Нагло ходил в гости. Табличка на двери сработала на 50%Никогда нас школа не хвалила. Девочка осваивает новый прибор. Мое неприятие их логики. И разошлись по будкам …Отбиваюсь от опасных ...", a.Excerpt)
 	assert.Equal(t, "https://podcast.umputun.com/images/uwp/uwp369.jpg", a.Image)
-	assert.Contains(t, ts.URL, a.Domain)
+	assert.Equal(t, tsURL.Host, a.Domain)
 	assert.Len(t, a.AllLinks, 13)
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/media/ump_podcast369.mp3")
 	assert.Contains(t, a.AllLinks, "https://podcast.umputun.com/images/uwp/uwp369.jpg")
@@ -149,13 +164,13 @@ func TestNormalizeLinks(t *testing.T) {
 	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	inp := `blah <img src="/aaa.png"/> sdfasd <a href="/blah2/aa.link">something</a> blah33 <img src="//aaa.com/xyz.jpg">xx</img>`
 	u, _ := url.Parse("http://ukeeper.com/blah")
-	out, links := lr.normalizeLinks(inp, &http.Request{URL: u})
+	out, links := lr.normalizeLinks(inp, u)
 	assert.Equal(t, `blah <img src="http://ukeeper.com/aaa.png"/> sdfasd <a href="http://ukeeper.com/blah2/aa.link">something</a> blah33 <img src="http://aaa.com/xyz.jpg">xx</img>`, out)
 	assert.Len(t, links, 3)
 
 	inp = `<body>
 		<img class="alignright size-full wp-image-944214 lazyloadableImage lazyLoad-fadeIn" alt="View Page Source" width="308" height="508" data-original="http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg" src="http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg"></body>`
-	_, links = lr.normalizeLinks(inp, &http.Request{URL: u})
+	_, links = lr.normalizeLinks(inp, u)
 	assert.Len(t, links, 1)
 	assert.Equal(t, "http://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg", links[0])
 }
@@ -170,6 +185,10 @@ func TestExtractByRule(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
 			fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -207,17 +226,134 @@ func TestExtractByRule(t *testing.T) {
 	})
 }
 
-func TestGetContentCustom(t *testing.T) {
-	rulesMock := &mocks.RulesMock{
-		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
-			return datastore.Rule{Content: "#content p, .post-title"}, true
+func TestExtractWithCustomRetriever(t *testing.T) {
+	testHTML := `<html><head><title>Test Page</title></head>
+<body><article><p>This is the article content from a custom retriever.</p></article></body></html>`
+
+	mockRetriever := &RetrieverMock{
+		RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+			header := make(http.Header)
+			header.Set("Content-Type", "text/html; charset=utf-8")
+			return &RetrieveResult{
+				Body:   []byte(testHTML),
+				URL:    reqURL,
+				Header: header,
+			}, nil
 		},
 	}
-	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200, Rules: rulesMock}
+
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200, Retriever: mockRetriever}
+	res, err := lr.Extract(context.Background(), "https://example.com/test-page")
+	require.NoError(t, err)
+
+	assert.Equal(t, "Test Page", res.Title)
+	assert.Equal(t, "https://example.com/test-page", res.URL)
+	assert.Equal(t, "example.com", res.Domain)
+	assert.NotEmpty(t, res.Content)
+	assert.Contains(t, res.Content, "article content from a custom retriever")
+
+	calls := mockRetriever.RetrieveCalls()
+	require.Len(t, calls, 1)
+	assert.Equal(t, "https://example.com/test-page", calls[0].URL)
+}
+
+func TestPickRetriever(t *testing.T) {
+	mkRetriever := func(tag string) *RetrieverMock {
+		return &RetrieverMock{
+			RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+				h := make(http.Header)
+				h.Set("Content-Type", "text/html; charset=utf-8")
+				return &RetrieveResult{
+					Body:   []byte("<html><head><title>" + tag + "</title></head><body><p>body-" + tag + "</p></body></html>"),
+					URL:    reqURL,
+					Header: h,
+				}, nil
+			},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		cfRouteAll    bool
+		useCloudflare bool
+		cfConfigured  bool
+		wantTag       string
+	}{
+		{name: "no CF configured uses HTTP", cfConfigured: false, wantTag: "http"},
+		{name: "CF configured, no flag uses HTTP", cfConfigured: true, wantTag: "http"},
+		{name: "CF configured, rule asks for CF uses CF", cfConfigured: true, useCloudflare: true, wantTag: "cf"},
+		{name: "CF configured, route-all uses CF", cfConfigured: true, cfRouteAll: true, wantTag: "cf"},
+		{name: "route-all overrides rule flag", cfConfigured: true, cfRouteAll: true, useCloudflare: false, wantTag: "cf"},
+		{name: "route-all without CF configured falls back to HTTP", cfConfigured: false, cfRouteAll: true, wantTag: "http"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpR := mkRetriever("http")
+			var cfR *RetrieverMock
+			lr := UReadability{
+				TimeOut:     time.Second,
+				SnippetSize: 200,
+				Retriever:   httpR,
+				CFRouteAll:  tt.cfRouteAll,
+				Rules: &mocks.RulesMock{
+					GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
+						return datastore.Rule{Domain: "example.com", UseCloudflare: tt.useCloudflare}, true
+					},
+				},
+			}
+			if tt.cfConfigured {
+				cfR = mkRetriever("cf")
+				lr.CFRetriever = cfR
+			}
+
+			_, err := lr.Extract(context.Background(), "https://example.com/page")
+			require.NoError(t, err)
+
+			switch tt.wantTag {
+			case "http":
+				assert.Len(t, httpR.RetrieveCalls(), 1, "http retriever should have been called")
+				if cfR != nil {
+					assert.Empty(t, cfR.RetrieveCalls(), "cf retriever should not have been called")
+				}
+			case "cf":
+				require.NotNil(t, cfR)
+				assert.Len(t, cfR.RetrieveCalls(), 1, "cf retriever should have been called")
+				assert.Empty(t, httpR.RetrieveCalls(), "http retriever should not have been called")
+			}
+		})
+	}
+}
+
+func TestPickRetrieverNoRules(t *testing.T) {
+	httpR := &RetrieverMock{RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+		h := make(http.Header)
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		return &RetrieveResult{Body: []byte("<html><head><title>t</title></head><body>x</body></html>"), URL: reqURL, Header: h}, nil
+	}}
+	cfR := &RetrieverMock{RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+		h := make(http.Header)
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		return &RetrieveResult{Body: []byte("<html><head><title>t</title></head><body>x</body></html>"), URL: reqURL, Header: h}, nil
+	}}
+	lr := UReadability{TimeOut: time.Second, SnippetSize: 200, Retriever: httpR, CFRetriever: cfR} // no Rules
+	_, err := lr.Extract(context.Background(), "https://example.com/page")
+	require.NoError(t, err)
+	assert.Len(t, httpR.RetrieveCalls(), 1, "no rules → HTTP path")
+	assert.Empty(t, cfR.RetrieveCalls())
+}
+
+func TestGetContentCustom(t *testing.T) {
+	rule := &datastore.Rule{Content: "#content p, .post-title"}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
 			fh, err := os.Open("testdata/poiezdka-s-apple-maps.html")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			testHTML, err := io.ReadAll(fh)
 			assert.NoError(t, err)
 			assert.NoError(t, fh.Close())
@@ -234,7 +370,7 @@ func TestGetContentCustom(t *testing.T) {
 	require.NoError(t, err)
 	body := string(dataBytes)
 
-	content, rich, err := lr.getContent(context.Background(), body, ts.URL+"/2015/09/25/poiezdka-s-apple-maps/", nil)
+	content, rich, err := lr.getContent(context.Background(), body, ts.URL+"/2015/09/25/poiezdka-s-apple-maps/", rule)
 	require.NoError(t, err)
 	assert.Len(t, content, 6988)
 	assert.Len(t, rich, 7169)
