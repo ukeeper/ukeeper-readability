@@ -48,8 +48,10 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 		Addr:              fmt.Sprintf("%s:%d", address, port),
 		Handler:           s.routes(frontendDir),
 		ReadHeaderTimeout: 5 * time.Second,
-		// WriteTimeout:      120 * time.Second, // TODO: such a long timeout needed for blocking export (backup) request
-		IdleTimeout: 30 * time.Second,
+		// 150s ceiling fits the worst-case CF retriever path (1 initial + 2 retries with 11s/22s
+		// exponential backoff + up to 30s per CF request) while still capping runaway handlers.
+		WriteTimeout: 150 * time.Second,
+		IdleTimeout:  30 * time.Second,
 	}
 	go func() {
 		// shutdown on context cancellation
@@ -275,14 +277,15 @@ func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rule := datastore.Rule{
-		Enabled:   true,
-		ID:        getBid(r.FormValue("id")),
-		Domain:    r.FormValue("domain"),
-		Author:    r.FormValue("author"),
-		Content:   r.FormValue("content"),
-		MatchURLs: strings.Split(r.FormValue("match_url"), "\n"),
-		Excludes:  strings.Split(r.FormValue("excludes"), "\n"),
-		TestURLs:  strings.Split(r.FormValue("test_urls"), "\n"),
+		Enabled:       true,
+		ID:            getBid(r.FormValue("id")),
+		Domain:        r.FormValue("domain"),
+		Author:        r.FormValue("author"),
+		Content:       r.FormValue("content"),
+		MatchURLs:     strings.Split(r.FormValue("match_url"), "\n"),
+		Excludes:      strings.Split(r.FormValue("excludes"), "\n"),
+		TestURLs:      strings.Split(r.FormValue("test_urls"), "\n"),
+		UseCloudflare: r.FormValue("use_cloudflare") == "true",
 	}
 
 	// return error in case domain is not set

@@ -257,6 +257,92 @@ func TestExtractWithCustomRetriever(t *testing.T) {
 	assert.Equal(t, "https://example.com/test-page", calls[0].URL)
 }
 
+func TestPickRetriever(t *testing.T) {
+	mkRetriever := func(tag string) *RetrieverMock {
+		return &RetrieverMock{
+			RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+				h := make(http.Header)
+				h.Set("Content-Type", "text/html; charset=utf-8")
+				return &RetrieveResult{
+					Body:   []byte("<html><head><title>" + tag + "</title></head><body><p>body-" + tag + "</p></body></html>"),
+					URL:    reqURL,
+					Header: h,
+				}, nil
+			},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		cfRouteAll    bool
+		useCloudflare bool
+		cfConfigured  bool
+		wantTag       string
+	}{
+		{name: "no CF configured uses HTTP", cfConfigured: false, wantTag: "http"},
+		{name: "CF configured, no flag uses HTTP", cfConfigured: true, wantTag: "http"},
+		{name: "CF configured, rule asks for CF uses CF", cfConfigured: true, useCloudflare: true, wantTag: "cf"},
+		{name: "CF configured, route-all uses CF", cfConfigured: true, cfRouteAll: true, wantTag: "cf"},
+		{name: "route-all overrides rule flag", cfConfigured: true, cfRouteAll: true, useCloudflare: false, wantTag: "cf"},
+		{name: "route-all without CF configured falls back to HTTP", cfConfigured: false, cfRouteAll: true, wantTag: "http"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpR := mkRetriever("http")
+			var cfR *RetrieverMock
+			lr := UReadability{
+				TimeOut:     time.Second,
+				SnippetSize: 200,
+				Retriever:   httpR,
+				CFRouteAll:  tt.cfRouteAll,
+				Rules: &mocks.RulesMock{
+					GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
+						return datastore.Rule{Domain: "example.com", UseCloudflare: tt.useCloudflare}, true
+					},
+				},
+			}
+			if tt.cfConfigured {
+				cfR = mkRetriever("cf")
+				lr.CFRetriever = cfR
+			}
+
+			_, err := lr.Extract(context.Background(), "https://example.com/page")
+			require.NoError(t, err)
+
+			switch tt.wantTag {
+			case "http":
+				assert.Len(t, httpR.RetrieveCalls(), 1, "http retriever should have been called")
+				if cfR != nil {
+					assert.Empty(t, cfR.RetrieveCalls(), "cf retriever should not have been called")
+				}
+			case "cf":
+				require.NotNil(t, cfR)
+				assert.Len(t, cfR.RetrieveCalls(), 1, "cf retriever should have been called")
+				assert.Empty(t, httpR.RetrieveCalls(), "http retriever should not have been called")
+			}
+		})
+	}
+}
+
+func TestPickRetrieverNoRules(t *testing.T) {
+	httpR := &RetrieverMock{RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+		h := make(http.Header)
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		return &RetrieveResult{Body: []byte("<html><head><title>t</title></head><body>x</body></html>"), URL: reqURL, Header: h}, nil
+	}}
+	cfR := &RetrieverMock{RetrieveFunc: func(_ context.Context, reqURL string) (*RetrieveResult, error) {
+		h := make(http.Header)
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		return &RetrieveResult{Body: []byte("<html><head><title>t</title></head><body>x</body></html>"), URL: reqURL, Header: h}, nil
+	}}
+	lr := UReadability{TimeOut: time.Second, SnippetSize: 200, Retriever: httpR, CFRetriever: cfR} // no Rules
+	_, err := lr.Extract(context.Background(), "https://example.com/page")
+	require.NoError(t, err)
+	assert.Len(t, httpR.RetrieveCalls(), 1, "no rules → HTTP path")
+	assert.Empty(t, cfR.RetrieveCalls())
+}
+
 func TestGetContentCustom(t *testing.T) {
 	rulesMock := &mocks.RulesMock{
 		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {

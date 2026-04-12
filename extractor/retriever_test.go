@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -248,4 +249,164 @@ func TestCloudflareRetriever_SuccessFalse(t *testing.T) {
 	_, err := retriever.Retrieve(context.Background(), "https://example.com")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "success=false")
+}
+
+func TestCloudflareRetriever_RateLimitThenSuccess(t *testing.T) {
+	const testHTML = "<html><body>recovered</body></html>"
+	var calls atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		if n < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"success":false,"errors":[{"code":2001,"message":"Rate limit exceeded"}]}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(cfResponse{Success: true, Result: testHTML})
+	}))
+	defer ts.Close()
+
+	retriever := &CloudflareRetriever{
+		AccountID:  "test-account",
+		APIToken:   "test-token",
+		BaseURL:    ts.URL,
+		Timeout:    5 * time.Second,
+		MaxRetries: 3,
+		RetryDelay: 10 * time.Millisecond, // fast in tests
+	}
+	result, err := retriever.Retrieve(context.Background(), "https://example.com")
+	require.NoError(t, err)
+	assert.Equal(t, testHTML, string(result.Body))
+	assert.Equal(t, int32(3), calls.Load(), "should have retried twice before succeeding")
+}
+
+func TestCloudflareRetriever_RateLimitExhausted(t *testing.T) {
+	var calls atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"success":false,"errors":[{"code":2001,"message":"Rate limit exceeded"}]}`))
+	}))
+	defer ts.Close()
+
+	retriever := &CloudflareRetriever{
+		AccountID:  "test-account",
+		APIToken:   "test-token",
+		BaseURL:    ts.URL,
+		Timeout:    5 * time.Second,
+		MaxRetries: 2,
+		RetryDelay: 10 * time.Millisecond,
+	}
+	_, err := retriever.Retrieve(context.Background(), "https://example.com")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "429")
+	assert.Equal(t, int32(3), calls.Load(), "initial attempt + 2 retries")
+}
+
+func TestCloudflareRetriever_RateLimitHonoursRetryAfter(t *testing.T) {
+	var calls atomic.Int32
+	var timestamps [3]time.Time
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		if int(n) <= len(timestamps) {
+			timestamps[n-1] = time.Now()
+		}
+		if n < 2 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`rate limited`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(cfResponse{Success: true, Result: "<html>ok</html>"})
+	}))
+	defer ts.Close()
+
+	retriever := &CloudflareRetriever{
+		AccountID:  "test-account",
+		APIToken:   "test-token",
+		BaseURL:    ts.URL,
+		Timeout:    5 * time.Second,
+		MaxRetries: 2,
+		RetryDelay: 10 * time.Second, // would be ignored in favour of Retry-After
+	}
+	start := time.Now()
+	_, err := retriever.Retrieve(context.Background(), "https://example.com")
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, elapsed, 900*time.Millisecond, "should have waited for Retry-After")
+	assert.Less(t, elapsed, 3*time.Second, "should have used 1s Retry-After, not 10s base delay")
+}
+
+func TestCloudflareRetriever_RateLimitContextCancelled(t *testing.T) {
+	var calls atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`rate limited`))
+	}))
+	defer ts.Close()
+
+	retriever := &CloudflareRetriever{
+		AccountID:  "test-account",
+		APIToken:   "test-token",
+		BaseURL:    ts.URL,
+		Timeout:    5 * time.Second,
+		MaxRetries: 5,
+		RetryDelay: 10 * time.Second, // long enough that ctx cancel will fire first
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err := retriever.Retrieve(ctx, "https://example.com")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, int32(1), calls.Load(), "should abort in backoff before second call")
+}
+
+func TestCloudflareRetriever_RateLimitRetriesDisabled(t *testing.T) {
+	var calls atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`rate limited`))
+	}))
+	defer ts.Close()
+
+	retriever := &CloudflareRetriever{
+		AccountID:  "test-account",
+		APIToken:   "test-token",
+		BaseURL:    ts.URL,
+		Timeout:    5 * time.Second,
+		MaxRetries: -1,
+	}
+	_, err := retriever.Retrieve(context.Background(), "https://example.com")
+	require.Error(t, err)
+	assert.Equal(t, int32(1), calls.Load())
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  time.Duration
+		// allow a bit of slack for HTTP-date cases where time.Until is evaluated at assertion time
+		tolerance time.Duration
+	}{
+		{name: "empty", value: "", want: 0},
+		{name: "seconds", value: "5", want: 5 * time.Second},
+		{name: "zero", value: "0", want: 0},
+		{name: "negative", value: "-5", want: 0},
+		{name: "garbage", value: "soon", want: 0},
+		{name: "http date in the past", value: "Mon, 02 Jan 2006 15:04:05 GMT", want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseRetryAfter(tt.value)
+			if tt.tolerance == 0 {
+				assert.Equal(t, tt.want, got)
+				return
+			}
+			assert.InDelta(t, tt.want, got, float64(tt.tolerance))
+		})
+	}
 }

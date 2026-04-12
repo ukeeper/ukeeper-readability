@@ -34,13 +34,15 @@ type UReadability struct {
 	TimeOut     time.Duration
 	SnippetSize int
 	Rules       Rules
-	Retriever   Retriever
+	Retriever   Retriever // default retriever; when nil a cached HTTPRetriever is used
+	CFRetriever Retriever // optional Cloudflare Browser Rendering retriever; when set, enables routing
+	CFRouteAll  bool      // route every request through CFRetriever (requires CFRetriever != nil)
 
 	defaultRetrieverOnce sync.Once
 	defaultRetriever     Retriever
 }
 
-// retriever returns the configured Retriever, defaulting to a cached HTTPRetriever if nil
+// retriever returns the configured default Retriever, creating a cached HTTPRetriever if nil
 func (f *UReadability) retriever() Retriever {
 	if f.Retriever != nil {
 		return f.Retriever
@@ -49,6 +51,22 @@ func (f *UReadability) retriever() Retriever {
 		f.defaultRetriever = &HTTPRetriever{Timeout: f.TimeOut}
 	})
 	return f.defaultRetriever
+}
+
+// pickRetriever decides which retriever should fetch the given URL based on routing config and an
+// optional pre-resolved rule. Falls back to the default retriever unless CFRetriever is set AND
+// either CFRouteAll is true or the rule explicitly asks for Cloudflare.
+func (f *UReadability) pickRetriever(rule *datastore.Rule) Retriever {
+	if f.CFRetriever == nil {
+		return f.retriever()
+	}
+	if f.CFRouteAll {
+		return f.CFRetriever
+	}
+	if rule != nil && rule.UseCloudflare {
+		return f.CFRetriever
+	}
+	return f.retriever()
 }
 
 // Response from api calls
@@ -91,7 +109,15 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	log.Printf("[INFO] extract %s", reqURL)
 	rb := &Response{}
 
-	result, err := f.retriever().Retrieve(ctx, reqURL)
+	// look up a rule by domain once up front (unless one was explicitly passed) so retriever
+	// selection and getContent share the same lookup instead of paying for two round-trips.
+	if rule == nil && f.Rules != nil {
+		if r, found := f.Rules.Get(ctx, reqURL); found {
+			rule = &r
+		}
+	}
+
+	result, err := f.pickRetriever(rule).Retrieve(ctx, reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -136,10 +162,10 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	return rb, nil
 }
 
-// getContent retrieves content from raw body string, both content (text only) and rich (with html tags)
-// if rule is provided, it uses custom rule, otherwise tries to retrieve one from the storage,
-// and at last tries to use general readability parser
-func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule *datastore.Rule) (content, rich string, err error) {
+// getContent retrieves content from raw body string, both content (text only) and rich (with html tags).
+// if rule is provided, it tries the custom rule first and falls back to the general parser on failure.
+// rule lookup for a given URL is done upstream in extractWithRules.
+func (f *UReadability) getContent(_ context.Context, body, reqURL string, rule *datastore.Rule) (content, rich string, err error) {
 	// general parser
 	genParser := func(body, _ string) (content, rich string, err error) {
 		doc, err := readability.NewDocument(body)
@@ -172,19 +198,10 @@ func (f *UReadability) getContent(ctx context.Context, body, reqURL string, rule
 
 	if rule != nil {
 		log.Printf("[DEBUG] custom rule provided for %s: %v", reqURL, rule)
-		return customParser(body, reqURL, *rule)
-	}
-
-	if f.Rules != nil {
-		r := f.Rules
-		if rule, found := r.Get(ctx, reqURL); found {
-			if content, rich, err = customParser(body, reqURL, rule); err == nil {
-				return content, rich, nil
-			}
-			log.Printf("[WARN] custom extractor failed for %s, error=%v", reqURL, err) // back to general parser
+		if content, rich, err = customParser(body, reqURL, *rule); err == nil {
+			return content, rich, nil
 		}
-	} else {
-		log.Print("[DEBUG] no rules defined!")
+		log.Printf("[WARN] custom extractor failed for %s, error=%v", reqURL, err) // back to general parser
 	}
 
 	return genParser(body, reqURL)

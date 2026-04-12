@@ -29,6 +29,7 @@ var opts struct {
 	MongoDB     string            `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
 	CFAccountID string            `long:"cf-account-id" env:"CF_ACCOUNT_ID" description:"Cloudflare account ID for Browser Rendering API"`
 	CFAPIToken  string            `long:"cf-api-token" env:"CF_API_TOKEN" description:"Cloudflare API token with Browser Rendering Edit permission"`
+	CFRouteAll  bool              `long:"cf-route-all" env:"CF_ROUTE_ALL" description:"route every request through Cloudflare Browser Rendering (requires cf-account-id and cf-api-token)"`
 	Debug       bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
 }
 
@@ -50,19 +51,28 @@ func main() {
 	}
 	stores := db.GetStores()
 
-	var retriever extractor.Retriever
+	// default retriever is always HTTP; CF is optional and, when configured, acts as a
+	// second retriever available for per-rule routing or global route-all.
+	httpRetriever := &extractor.HTTPRetriever{Timeout: 30 * time.Second}
+	var cfRetriever extractor.Retriever
 	if opts.CFAccountID != "" && opts.CFAPIToken != "" {
-		retriever = &extractor.CloudflareRetriever{
+		cfRetriever = &extractor.CloudflareRetriever{
 			AccountID: opts.CFAccountID,
 			APIToken:  opts.CFAPIToken,
 			Timeout:   30 * time.Second,
 		}
-		log.Printf("[INFO] using Cloudflare Browser Rendering retriever, account=%s", opts.CFAccountID)
+		if opts.CFRouteAll {
+			log.Printf("[INFO] Cloudflare Browser Rendering enabled, account=%s, mode=route-all", opts.CFAccountID)
+		} else {
+			log.Printf("[INFO] Cloudflare Browser Rendering enabled, account=%s, mode=per-rule", opts.CFAccountID)
+		}
 	} else {
 		if opts.CFAccountID != "" || opts.CFAPIToken != "" {
-			log.Print("[WARN] both --cf-account-id and --cf-api-token must be set for Cloudflare Browser Rendering; falling back to default HTTP retriever")
+			log.Print("[WARN] both --cf-account-id and --cf-api-token must be set for Cloudflare Browser Rendering; disabling Cloudflare routing")
 		}
-		retriever = &extractor.HTTPRetriever{Timeout: 30 * time.Second}
+		if opts.CFRouteAll {
+			log.Print("[WARN] --cf-route-all is set but Cloudflare credentials are not configured; routing through default HTTP retriever")
+		}
 		log.Print("[INFO] using default HTTP retriever")
 	}
 
@@ -71,7 +81,9 @@ func main() {
 			TimeOut:     30 * time.Second,
 			SnippetSize: 300,
 			Rules:       stores.Rules,
-			Retriever:   retriever,
+			Retriever:   httpRetriever,
+			CFRetriever: cfRetriever,
+			CFRouteAll:  opts.CFRouteAll,
 		},
 		Token:       opts.Token,
 		Credentials: opts.Credentials,
