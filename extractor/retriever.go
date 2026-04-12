@@ -108,7 +108,7 @@ type CloudflareRetriever struct {
 	APIToken   string
 	BaseURL    string        // override for testing; defaults to Cloudflare API
 	Timeout    time.Duration // per-request HTTP client timeout; defaults to 60s
-	MaxRetries int           // number of retries on 429; defaults to 3. set to -1 to disable retries
+	MaxRetries int           // number of retries on 429; 0 means no retries. use CFDefaultMaxRetries (2) for sensible production default
 	RetryDelay time.Duration // base delay between 429 retries; defaults to 11s (CF free tier is 1 req/10s)
 
 	once   sync.Once
