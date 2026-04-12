@@ -18,13 +18,17 @@
 | creds        | CREDS           | none           | credentials for protected calls (POST, DELETE /rules) |
 | cf-account-id| CF_ACCOUNT_ID   | none           | Cloudflare account ID for Browser Rendering API       |
 | cf-api-token | CF_API_TOKEN    | none           | Cloudflare API token with Browser Rendering Edit perm |
+| cf-route-all | CF_ROUTE_ALL    | `false`        | route every request through Cloudflare Browser Rendering |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
 
 ### Cloudflare Browser Rendering (optional)
 
-When both `--cf-account-id` and `--cf-api-token` are set, the service uses Cloudflare Browser Rendering API to fetch page content instead of direct HTTP. This renders JavaScript and handles bot-protection pages that return empty or "just a moment..." responses to standard HTTP requests.
+Cloudflare Browser Rendering is useful for JavaScript-heavy pages and sites behind a "please enable JS" wall, but it's slower than direct HTTP and the free tier throttles at 1 request per 10 seconds. To keep the service cost-effective, Cloudflare routing is **opt-in**.
 
-When these flags are not set, the service uses a standard HTTP client (default).
+1. Set `--cf-account-id` and `--cf-api-token` to enable Cloudflare routing.
+2. Either flip the `use_cloudflare` checkbox on individual rules (per-domain, recommended) or set `--cf-route-all=true` to route every request through Cloudflare.
+
+When Cloudflare credentials are not set, the service uses a standard HTTP client for everything (default). On HTTP 429 (rate limit) the service automatically retries with exponential backoff and respects the `Retry-After` header.
 
 ### API
 

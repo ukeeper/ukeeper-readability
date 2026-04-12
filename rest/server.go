@@ -48,8 +48,12 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 		Addr:              fmt.Sprintf("%s:%d", address, port),
 		Handler:           s.routes(frontendDir),
 		ReadHeaderTimeout: 5 * time.Second,
-		// 150s ceiling fits the worst-case CF retriever path (1 initial + 2 retries with 11s/22s
-		// exponential backoff + up to 30s per CF request) while still capping runaway handlers.
+		// WriteTimeout is server-wide rather than per-route because the extraction endpoints
+		// are the only potentially long-running handlers (other handlers — static files, rule
+		// CRUD, /ping — finish in milliseconds and are unaffected by this ceiling). 150s covers
+		// the worst-case Cloudflare path: 1 initial request + 2 retries with 11s/22s exponential
+		// backoff + up to 30s per CF request. If extraction ever moves off the server-wide
+		// timeout, wrap only those routes with http.TimeoutHandler instead.
 		WriteTimeout: 150 * time.Second,
 		IdleTimeout:  30 * time.Second,
 	}

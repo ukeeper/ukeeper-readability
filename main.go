@@ -57,9 +57,10 @@ func main() {
 	var cfRetriever extractor.Retriever
 	if opts.CFAccountID != "" && opts.CFAPIToken != "" {
 		cfRetriever = &extractor.CloudflareRetriever{
-			AccountID: opts.CFAccountID,
-			APIToken:  opts.CFAPIToken,
-			Timeout:   30 * time.Second,
+			AccountID:  opts.CFAccountID,
+			APIToken:   opts.CFAPIToken,
+			Timeout:    30 * time.Second,
+			MaxRetries: extractor.CFDefaultMaxRetries,
 		}
 		if opts.CFRouteAll {
 			log.Printf("[INFO] Cloudflare Browser Rendering enabled, account=%s, mode=route-all", opts.CFAccountID)

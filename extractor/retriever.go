@@ -83,14 +83,17 @@ func (h *HTTPRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveR
 }
 
 const (
-	cfDefaultBaseURL   = "https://api.cloudflare.com/client/v4"
-	cfDefaultWaitUntil = "networkidle0"
-	cfDefaultTimeout   = 60 * time.Second
-	// cfDefaultMaxRetries=2 keeps worst-case backoff at ~33s (11s + 22s) so total handler time
-	// stays under common upstream timeouts (nginx proxy_read_timeout default is 60s).
-	cfDefaultMaxRetries = 2
+	cfDefaultBaseURL    = "https://api.cloudflare.com/client/v4"
+	cfDefaultWaitUntil  = "networkidle0"
+	cfDefaultTimeout    = 60 * time.Second
 	cfDefaultRetryDelay = 11 * time.Second // free tier: 1 req / 10s — add a little headroom
 	cfMaxRetryDelay     = 30 * time.Second
+
+	// CFDefaultMaxRetries is the suggested MaxRetries value for production CloudflareRetriever setup.
+	// 2 retries keeps worst-case backoff at ~33s (11s + 22s) so the total handler time stays under
+	// common upstream timeouts (nginx proxy_read_timeout default is 60s). Callers must set MaxRetries
+	// explicitly — CloudflareRetriever does not substitute a default for the zero value.
+	CFDefaultMaxRetries = 2
 )
 
 // errCFRateLimited is returned by the single-attempt inner retrieve when the CF API signals rate limiting;
@@ -140,11 +143,9 @@ type cfResponse struct {
 // Retrieve fetches the URL via Cloudflare Browser Rendering /content endpoint.
 // on HTTP 429 it backs off and retries up to MaxRetries times, holding the caller's
 // connection open in the meantime. aborts early if the caller's context is canceled.
+// MaxRetries: 0 means no retries. RetryDelay: 0 falls back to the package default.
 func (c *CloudflareRetriever) Retrieve(ctx context.Context, reqURL string) (*RetrieveResult, error) {
 	maxRetries := c.MaxRetries
-	if maxRetries == 0 {
-		maxRetries = cfDefaultMaxRetries
-	}
 	if maxRetries < 0 {
 		maxRetries = 0
 	}

@@ -364,24 +364,35 @@ func TestCloudflareRetriever_RateLimitContextCancelled(t *testing.T) {
 }
 
 func TestCloudflareRetriever_RateLimitRetriesDisabled(t *testing.T) {
-	var calls atomic.Int32
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.WriteHeader(http.StatusTooManyRequests)
-		_, _ = w.Write([]byte(`rate limited`))
-	}))
-	defer ts.Close()
-
-	retriever := &CloudflareRetriever{
-		AccountID:  "test-account",
-		APIToken:   "test-token",
-		BaseURL:    ts.URL,
-		Timeout:    5 * time.Second,
-		MaxRetries: -1,
+	tests := []struct {
+		name       string
+		maxRetries int
+	}{
+		{name: "zero means no retries", maxRetries: 0},
+		{name: "negative clamped to zero", maxRetries: -1},
 	}
-	_, err := retriever.Retrieve(context.Background(), "https://example.com")
-	require.Error(t, err)
-	assert.Equal(t, int32(1), calls.Load())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var calls atomic.Int32
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				calls.Add(1)
+				w.WriteHeader(http.StatusTooManyRequests)
+				_, _ = w.Write([]byte(`rate limited`))
+			}))
+			defer ts.Close()
+
+			retriever := &CloudflareRetriever{
+				AccountID:  "test-account",
+				APIToken:   "test-token",
+				BaseURL:    ts.URL,
+				Timeout:    5 * time.Second,
+				MaxRetries: tt.maxRetries,
+			}
+			_, err := retriever.Retrieve(context.Background(), "https://example.com")
+			require.Error(t, err)
+			assert.Equal(t, int32(1), calls.Load())
+		})
+	}
 }
 
 func TestParseRetryAfter(t *testing.T) {

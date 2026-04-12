@@ -344,12 +344,8 @@ func TestPickRetrieverNoRules(t *testing.T) {
 }
 
 func TestGetContentCustom(t *testing.T) {
-	rulesMock := &mocks.RulesMock{
-		GetFunc: func(_ context.Context, _ string) (datastore.Rule, bool) {
-			return datastore.Rule{Content: "#content p, .post-title"}, true
-		},
-	}
-	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200, Rules: rulesMock}
+	rule := &datastore.Rule{Content: "#content p, .post-title"}
+	lr := UReadability{TimeOut: 30 * time.Second, SnippetSize: 200}
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == "/2015/09/25/poiezdka-s-apple-maps/" {
@@ -374,7 +370,7 @@ func TestGetContentCustom(t *testing.T) {
 	require.NoError(t, err)
 	body := string(dataBytes)
 
-	content, rich, err := lr.getContent(context.Background(), body, ts.URL+"/2015/09/25/poiezdka-s-apple-maps/", nil)
+	content, rich, err := lr.getContent(context.Background(), body, ts.URL+"/2015/09/25/poiezdka-s-apple-maps/", rule)
 	require.NoError(t, err)
 	assert.Len(t, content, 6988)
 	assert.Len(t, rich, 7169)
