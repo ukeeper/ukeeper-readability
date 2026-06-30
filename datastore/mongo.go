@@ -45,9 +45,9 @@ type Stores struct {
 // GetStores initialize collections and make indexes
 func (m *MongoServer) GetStores() Stores {
 	rIndexes := []mongo.IndexModel{
-		{Keys: bson.D{{Key: "enabled", Value: 1}, {Key: "domain", Value: 1}}},
-		{Keys: bson.D{{Key: "user", Value: 1}, {Key: "domain", Value: 1}, {Key: "enabled", Value: 1}}},
-		{Keys: bson.D{{Key: "domain", Value: 1}, {Key: "match_urls", Value: 1}}},
+		{Keys: bson.D{{Key: fieldEnabled, Value: 1}, {Key: fieldDomain, Value: 1}}},
+		{Keys: bson.D{{Key: "user", Value: 1}, {Key: fieldDomain, Value: 1}, {Key: fieldEnabled, Value: 1}}},
+		{Keys: bson.D{{Key: fieldDomain, Value: 1}, {Key: "match_urls", Value: 1}}},
 	}
 
 	return Stores{
