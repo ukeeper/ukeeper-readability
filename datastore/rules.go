@@ -11,6 +11,14 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
+// mongo field names and operators reused across queries
+const (
+	fieldDomain  = "domain"
+	fieldEnabled = "enabled"
+	fieldID      = "_id"
+	opSet        = "$set"
+)
+
 // RulesDAO data-access obj for custom parsing rules, implements Rules
 type RulesDAO struct {
 	*mongo.Collection
@@ -40,7 +48,7 @@ func (r RulesDAO) Get(ctx context.Context, rURL string) (Rule, bool) {
 	}
 
 	var rules []Rule
-	q := bson.M{"domain": u.Host, "enabled": true}
+	q := bson.M{fieldDomain: u.Host, fieldEnabled: true}
 	log.Printf("[DEBUG] query %v", q)
 	cursor, err := r.Find(ctx, q)
 	if err != nil {
@@ -59,13 +67,13 @@ func (r RulesDAO) Get(ctx context.Context, rURL string) (Rule, bool) {
 // GetByID returns record by id
 func (r RulesDAO) GetByID(ctx context.Context, id bson.ObjectID) (Rule, bool) {
 	var rule Rule
-	err := r.Collection.FindOne(ctx, bson.M{"_id": id}).Decode(&rule)
+	err := r.Collection.FindOne(ctx, bson.M{fieldID: id}).Decode(&rule)
 	return rule, err == nil
 }
 
 // Save upsert rule
 func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
-	ch, err := r.UpdateOne(ctx, bson.M{"domain": rule.Domain}, bson.M{"$set": rule}, options.UpdateOne().SetUpsert(true))
+	ch, err := r.UpdateOne(ctx, bson.M{fieldDomain: rule.Domain}, bson.M{opSet: rule}, options.UpdateOne().SetUpsert(true))
 	if err != nil {
 		log.Printf("[WARN] failed to save, error=%v, article=%v", err, rule)
 		return rule, err
@@ -78,7 +86,7 @@ func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
 	// if rule was updated, we have no id, so try to find it by domain
 	if rule.ID == bson.NilObjectID {
 		var found Rule
-		err = r.Collection.FindOne(ctx, bson.M{"domain": rule.Domain}).Decode(&found)
+		err = r.Collection.FindOne(ctx, bson.M{fieldDomain: rule.Domain}).Decode(&found)
 		if err == nil {
 			rule.ID = found.ID
 		}
@@ -88,7 +96,7 @@ func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
 
 // Disable marks enabled=false, by id
 func (r RulesDAO) Disable(ctx context.Context, id bson.ObjectID) error {
-	_, err := r.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": bson.M{"enabled": false}})
+	_, err := r.UpdateOne(ctx, bson.M{fieldID: id}, bson.M{opSet: bson.M{fieldEnabled: false}})
 	return err
 }
 
