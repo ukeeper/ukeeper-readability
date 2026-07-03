@@ -59,6 +59,30 @@ func TestRulesSave(t *testing.T) {
 		assert.Equal(t, rule.TestURLs, saved.TestURLs)
 	})
 
+	t.Run("clearing multi-value fields overwrites stored arrays", func(t *testing.T) {
+		domain := randDomain()
+		_, err := rules.Save(context.Background(), Rule{
+			Domain:        domain,
+			MatchURLs:     []string{"/blog/*"},
+			Excludes:      []string{".sidebar"},
+			TestURLs:      []string{"https://example.com/test"},
+			UseCloudflare: true,
+			Enabled:       true,
+		})
+		require.NoError(t, err)
+
+		// re-save the same domain with the multi-value fields and checkbox cleared; none must persist
+		_, err = rules.Save(context.Background(), Rule{Domain: domain, Content: ".body", Enabled: true})
+		require.NoError(t, err)
+
+		got, ok := rules.Get(context.Background(), "https://"+domain+"/page")
+		require.True(t, ok)
+		assert.Empty(t, got.MatchURLs)
+		assert.Empty(t, got.Excludes)
+		assert.Empty(t, got.TestURLs)
+		assert.False(t, got.UseCloudflare, "unchecking the checkbox must clear the stored flag")
+	})
+
 	t.Run("save with canceled context", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
