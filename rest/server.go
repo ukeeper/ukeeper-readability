@@ -208,7 +208,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	testURLs := strings.Split(r.FormValue("test_urls"), "\n")
+	testURLs := splitTrimLines(r.FormValue("test_urls"))
 	content := strings.TrimSpace(r.FormValue("content"))
 	log.Printf("[INFO] test urls: %v", testURLs)
 	log.Printf("[INFO] custom rule: %v", content)
@@ -224,11 +224,6 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 	responses := make([]extractor.Response, 0, len(testURLs))
 	for _, url := range testURLs {
-		url = strings.TrimSpace(url)
-		if url == "" {
-			continue
-		}
-
 		log.Printf("[DEBUG] custom rule provided for %s: %v", url, tempRule)
 		result, e := s.Readability.ExtractByRule(r.Context(), url, tempRule)
 		if e != nil {
@@ -286,9 +281,9 @@ func (s *Server) saveRule(w http.ResponseWriter, r *http.Request) {
 		Domain:        r.FormValue("domain"),
 		Author:        r.FormValue("author"),
 		Content:       r.FormValue("content"),
-		MatchURLs:     strings.Split(r.FormValue("match_url"), "\n"),
-		Excludes:      strings.Split(r.FormValue("excludes"), "\n"),
-		TestURLs:      strings.Split(r.FormValue("test_urls"), "\n"),
+		MatchURLs:     splitTrimLines(r.FormValue("match_url")),
+		Excludes:      splitTrimLines(r.FormValue("excludes")),
+		TestURLs:      splitTrimLines(r.FormValue("test_urls")),
 		UseCloudflare: r.FormValue("use_cloudflare") == "true",
 	}
 
@@ -342,6 +337,19 @@ func (s *Server) toggleRule(w http.ResponseWriter, r *http.Request) {
 func (s *Server) authFake(w http.ResponseWriter, _ *http.Request) {
 	t := time.Now()
 	rest.RenderJSON(w, JSON{"pong": t.Format("20060102150405")})
+}
+
+// splitTrimLines splits a textarea value into lines, trims surrounding whitespace (including the
+// \r that browsers send as part of \r\n line endings) and drops empty lines.
+func splitTrimLines(s string) []string {
+	raw := strings.Split(s, "\n")
+	out := make([]string, 0, len(raw))
+	for _, line := range raw {
+		if v := strings.TrimSpace(line); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func getBid(id string) bson.ObjectID {

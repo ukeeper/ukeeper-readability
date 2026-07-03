@@ -49,7 +49,7 @@ func TestExtractPicsDirectly(t *testing.T) {
 		d, err := goquery.NewDocumentFromReader(strings.NewReader(data))
 		require.NoError(t, err)
 		sel := d.Find("img")
-		im, allImages, ok := lr.extractPics(sel, "url")
+		im, allImages, ok := lr.extractPics(context.Background(), sel, "url")
 		assert.True(t, ok)
 		assert.Len(t, allImages, 1)
 		assert.Equal(t, "https://cdn1.tnwcdn.com/wp-content/blogs.dir/1/files/2016/01/page-source.jpg", im)
@@ -60,7 +60,7 @@ func TestExtractPicsDirectly(t *testing.T) {
 		d, err := goquery.NewDocumentFromReader(strings.NewReader(data))
 		require.NoError(t, err)
 		sel := d.Find("img")
-		im, allImages, ok := lr.extractPics(sel, "url")
+		im, allImages, ok := lr.extractPics(context.Background(), sel, "url")
 		assert.False(t, ok)
 		assert.Empty(t, allImages)
 		assert.Empty(t, im)
@@ -71,10 +71,29 @@ func TestExtractPicsDirectly(t *testing.T) {
 		d, err := goquery.NewDocumentFromReader(strings.NewReader(data))
 		require.NoError(t, err)
 		sel := d.Find("img")
-		im, allImages, ok := lr.extractPics(sel, "url")
+		im, allImages, ok := lr.extractPics(context.Background(), sel, "url")
 		assert.True(t, ok)
 		assert.Len(t, allImages, 1)
 		assert.Equal(t, "http://bad_url", im)
+	})
+
+	t.Run("cancelled context returns zero size", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("some-image-bytes"))
+		}))
+		defer ts.Close()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		assert.Equal(t, 0, lr.getImageSize(ctx, ts.URL))
+	})
+
+	t.Run("measures image size by streamed bytes", func(t *testing.T) {
+		payload := strings.Repeat("x", 1234)
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(payload))
+		}))
+		defer ts.Close()
+		assert.Equal(t, len(payload), lr.getImageSize(context.Background(), ts.URL))
 	})
 
 	t.Run("bad body of the image", func(t *testing.T) {
@@ -86,7 +105,7 @@ func TestExtractPicsDirectly(t *testing.T) {
 		d, err := goquery.NewDocumentFromReader(strings.NewReader(data))
 		require.NoError(t, err)
 		sel := d.Find("img")
-		im, allImages, ok := lr.extractPics(sel, "url")
+		im, allImages, ok := lr.extractPics(context.Background(), sel, "url")
 		assert.True(t, ok)
 		assert.Len(t, allImages, 1)
 		assert.Equal(t, ts.URL, im)

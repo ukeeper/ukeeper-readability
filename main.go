@@ -53,7 +53,7 @@ func main() {
 
 	// default retriever is always HTTP; CF is optional and, when configured, acts as a
 	// second retriever available for per-rule routing or global route-all.
-	httpRetriever := &extractor.HTTPRetriever{Timeout: 30 * time.Second}
+	httpRetriever := &extractor.HTTPRetriever{Timeout: 30 * time.Second, BlockPrivateNetworks: true}
 	var cfRetriever extractor.Retriever
 	if opts.CFAccountID != "" && opts.CFAPIToken != "" {
 		cfRetriever = &extractor.CloudflareRetriever{
@@ -79,12 +79,13 @@ func main() {
 
 	srv := rest.Server{
 		Readability: extractor.UReadability{
-			TimeOut:     30 * time.Second,
-			SnippetSize: 300,
-			Rules:       stores.Rules,
-			Retriever:   httpRetriever,
-			CFRetriever: cfRetriever,
-			CFRouteAll:  opts.CFRouteAll,
+			TimeOut:              30 * time.Second,
+			SnippetSize:          300,
+			Rules:                stores.Rules,
+			Retriever:            httpRetriever,
+			CFRetriever:          cfRetriever,
+			CFRouteAll:           opts.CFRouteAll,
+			BlockPrivateNetworks: true,
 		},
 		Token:       opts.Token,
 		Credentials: opts.Credentials,

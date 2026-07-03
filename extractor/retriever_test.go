@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -77,6 +78,50 @@ func TestHTTPRetriever_Retrieve(t *testing.T) {
 			assert.Equal(t, tt.wantBody, string(result.Body))
 			assert.Equal(t, tt.wantURL, result.URL)
 			assert.NotNil(t, result.Header)
+		})
+	}
+}
+
+func TestHTTPRetriever_BlockPrivateNetworks(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("<html><body>internal</body></html>"))
+	}))
+	defer ts.Close()
+
+	t.Run("blocks loopback when enabled", func(t *testing.T) {
+		retriever := &HTTPRetriever{Timeout: 5 * time.Second, BlockPrivateNetworks: true}
+		result, err := retriever.Retrieve(context.Background(), ts.URL)
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, errBlockedAddress)
+	})
+
+	t.Run("allows loopback when disabled", func(t *testing.T) {
+		retriever := &HTTPRetriever{Timeout: 5 * time.Second}
+		result, err := retriever.Retrieve(context.Background(), ts.URL)
+		require.NoError(t, err)
+		assert.Equal(t, "<html><body>internal</body></html>", string(result.Body))
+	})
+}
+
+func TestIsBlockedIP(t *testing.T) {
+	tests := []struct {
+		ip      string
+		blocked bool
+	}{
+		{"127.0.0.1", true},
+		{"::1", true},
+		{"10.0.0.1", true},
+		{"192.168.1.1", true},
+		{"172.16.0.1", true},
+		{"169.254.169.254", true}, // cloud metadata endpoint
+		{"0.0.0.0", true},
+		{"8.8.8.8", false},
+		{"1.1.1.1", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ip, func(t *testing.T) {
+			assert.Equal(t, tt.blocked, isBlockedIP(net.ParseIP(tt.ip)))
 		})
 	}
 }
