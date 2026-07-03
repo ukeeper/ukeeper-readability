@@ -4,6 +4,7 @@ package extractor
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -40,6 +41,9 @@ type UReadability struct {
 
 	defaultRetrieverOnce sync.Once
 	defaultRetriever     Retriever
+
+	imgClientOnce sync.Once
+	imgClient     *http.Client
 }
 
 // retriever returns the configured default Retriever, creating a cached HTTPRetriever if nil
@@ -153,7 +157,7 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 		log.Printf("[WARN] failed to create document from reader, error=%v", err)
 		return nil, err
 	}
-	if im, allImages, ok := f.extractPics(darticle.Find("img"), reqURL); ok {
+	if im, allImages, ok := f.extractPics(ctx, darticle.Find("img"), reqURL); ok {
 		rb.Image = im
 		rb.AllImages = allImages
 	}

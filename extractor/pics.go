@@ -1,6 +1,7 @@
 package extractor
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"sort"
@@ -11,21 +12,49 @@ import (
 	log "github.com/go-pkgz/lgr"
 )
 
-func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
-	images := make(map[int]string)
+const (
+	imageFetchTimeout       = 15 * time.Second // per-image probe timeout, kept below imageProbeBudget
+	imageProbeBudget        = 30 * time.Second // overall budget for probing every image on a page
+	maxImageBytes           = 10 << 20         // cap when streaming to measure, avoids buffering huge files
+	maxConcurrentImageFetch = 8                // limit parallel image probes per page
+)
 
-	type imgInfo struct {
-		url  string
-		size int
-	}
-	var resCh = make(chan imgInfo)
+// imageClient returns a lazily-built HTTP client for image size probes, shared across all fetches
+// instead of building a fresh client per image.
+func (f *UReadability) imageClient() *http.Client {
+	f.imgClientOnce.Do(func() {
+		f.imgClient = &http.Client{Timeout: imageFetchTimeout}
+	})
+	return f.imgClient
+}
+
+type imgInfo struct {
+	url  string
+	size int
+}
+
+func (f *UReadability) extractPics(ctx context.Context, iselect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
+	// bound total image probing so a page full of slow image URLs can't hold the handler open for
+	// ceil(n/maxConcurrentImageFetch) * imageFetchTimeout and blow past the server write timeout.
+	ctx, cancel := context.WithTimeout(ctx, imageProbeBudget)
+	defer cancel()
+
+	resCh := make(chan imgInfo)
 	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxConcurrentImageFetch)
 
 	iselect.Each(func(_ int, s *goquery.Selection) {
-		if im, ok := s.Attr("src"); ok {
+		if im, exists := s.Attr("src"); exists {
 			wg.Go(func() {
-				size := f.getImageSize(im)
-				resCh <- imgInfo{url: im, size: size}
+				// acquire a slot, but give up if the overall budget is already spent
+				select {
+				case sem <- struct{}{}:
+					defer func() { <-sem }()
+				case <-ctx.Done():
+					resCh <- imgInfo{url: im, size: 0}
+					return
+				}
+				resCh <- imgInfo{url: im, size: f.getImageSize(ctx, im)}
 			})
 		}
 	})
@@ -35,37 +64,40 @@ func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (main
 		close(resCh)
 	}()
 
+	var results []imgInfo
 	for r := range resCh {
-		images[r.size] = r.url
+		results = append(results, r)
 		allImages = append(allImages, r.url)
 	}
 	sort.Strings(allImages)
-	if len(images) == 0 {
+	if len(results) == 0 {
 		return "", nil, false
 	}
 
-	// get the biggest picture
-	keys := make([]int, 0, len(images))
-	for k := range images {
-		keys = append(keys, k)
+	// pick the largest image; break ties by URL so lead-image selection is deterministic rather
+	// than dependent on goroutine scheduling / map iteration order.
+	best := results[0]
+	for _, r := range results[1:] {
+		if r.size > best.size || (r.size == best.size && r.url < best.url) {
+			best = r
+		}
 	}
-	sort.Sort(sort.Reverse(sort.IntSlice(keys)))
-	mainImage = images[keys[0]]
-	log.Printf("[DEBUG] total images from %s = %d, main=%s (%d)", url, len(images), mainImage, keys[0])
-	return mainImage, allImages, true
+	log.Printf("[DEBUG] total images from %s = %d, main=%s (%d)", url, len(results), best.url, best.size)
+	return best.url, allImages, true
 }
 
-// getImageSize loads image to get size
-func (f *UReadability) getImageSize(url string) (size int) {
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	req, err := http.NewRequest("GET", url, http.NoBody)
+// getImageSize measures an image's byte size by streaming it to io.Discard behind a maxImageBytes
+// limit, without buffering it whole and honoring the caller's context. The body is actually read
+// (rather than trusting Content-Length) so a broken endpoint or a lying header can't inflate an
+// image's rank; an unreadable body sizes as 0, matching the previous behavior.
+func (f *UReadability) getImageSize(ctx context.Context, url string) (size int) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		log.Printf("[WARN] can't create request to get pic from %s", url)
 		return 0
 	}
-	req.Close = true
 	req.Header.Set("User-Agent", userAgent)
-	resp, err := httpClient.Do(req)
+	resp, err := f.imageClient().Do(req)
 	if err != nil {
 		log.Printf("[WARN] can't get %s, error=%v", url, err)
 		return 0
@@ -76,10 +108,16 @@ func (f *UReadability) getImageSize(url string) (size int) {
 		}
 	}()
 
-	data, err := io.ReadAll(resp.Body)
+	// treat non-2xx as size 0 so an error page (404/500 HTML) can't be ranked as the lead image
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		log.Printf("[DEBUG] non-2xx (%d) for image %s, sizing as 0", resp.StatusCode, url)
+		return 0
+	}
+
+	n, err := io.Copy(io.Discard, io.LimitReader(resp.Body, maxImageBytes))
 	if err != nil {
 		log.Printf("[WARN] failed to get %s, err=%v", url, err)
 		return 0
 	}
-	return len(data)
+	return int(n)
 }
