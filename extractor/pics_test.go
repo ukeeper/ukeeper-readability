@@ -92,3 +92,21 @@ func TestExtractPicsDirectly(t *testing.T) {
 		assert.Equal(t, ts.URL, im)
 	})
 }
+
+func TestGetImageSize_BlockPrivateNetworks(t *testing.T) {
+	payload := strings.Repeat("x", 512)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(payload))
+	}))
+	defer ts.Close()
+
+	t.Run("blocked loopback yields zero size", func(t *testing.T) {
+		lr := UReadability{TimeOut: 5 * time.Second, BlockPrivateNetworks: true}
+		assert.Equal(t, 0, lr.getImageSize(ts.URL))
+	})
+
+	t.Run("allowed when disabled", func(t *testing.T) {
+		lr := UReadability{TimeOut: 5 * time.Second}
+		assert.Equal(t, len(payload), lr.getImageSize(ts.URL))
+	})
+}

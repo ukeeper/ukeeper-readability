@@ -19,7 +19,10 @@
 | cf-account-id| CF_ACCOUNT_ID   | none           | Cloudflare account ID for Browser Rendering API       |
 | cf-api-token | CF_API_TOKEN    | none           | Cloudflare API token with Browser Rendering Edit perm |
 | cf-route-all | CF_ROUTE_ALL    | `false`        | route every request through Cloudflare Browser Rendering |
+| allow-private-networks | ALLOW_PRIVATE_NETWORKS | `false` | allow fetching URLs that resolve to loopback/private/link-local addresses (disables the SSRF guard; enable only for trusted intranet use) |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
+
+The SSRF guard (on by default) blocks fetches to non-public addresses and, to prevent bypass, ignores `HTTP_PROXY`/`HTTPS_PROXY` on outbound requests. Deployments that must reach the internet through an outbound proxy should run with `--allow-private-networks` (which restores proxy-aware transport) and enforce egress restrictions at the network layer instead. Note that requests routed through Cloudflare Browser Rendering are validated on the submitted host only; Cloudflare performs its own DNS resolution and redirect following remotely, so it is not covered by the connect-time guard (it cannot reach this service's internal network either way).
 
 ### Cloudflare Browser Rendering (optional)
 

@@ -11,6 +11,19 @@ import (
 	log "github.com/go-pkgz/lgr"
 )
 
+// imageClient returns a lazily-built HTTP client for image size probes, shared across all fetches
+// (a Transport is long-lived and pools connections; building one per image would churn FDs), and
+// honoring BlockPrivateNetworks to guard against SSRF via image URLs.
+func (f *UReadability) imageClient() *http.Client {
+	f.imgClientOnce.Do(func() {
+		f.imgClient = &http.Client{Timeout: 30 * time.Second}
+		if f.BlockPrivateNetworks {
+			f.imgClient.Transport = safeTransport(30 * time.Second)
+		}
+	})
+	return f.imgClient
+}
+
 func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (mainImage string, allImages []string, ok bool) {
 	images := make(map[int]string)
 
@@ -57,15 +70,13 @@ func (f *UReadability) extractPics(iselect *goquery.Selection, url string) (main
 
 // getImageSize loads image to get size
 func (f *UReadability) getImageSize(url string) (size int) {
-	httpClient := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		log.Printf("[WARN] can't create request to get pic from %s", url)
 		return 0
 	}
-	req.Close = true
 	req.Header.Set("User-Agent", userAgent)
-	resp, err := httpClient.Do(req)
+	resp, err := f.imageClient().Do(req)
 	if err != nil {
 		log.Printf("[WARN] can't get %s, error=%v", url, err)
 		return 0
