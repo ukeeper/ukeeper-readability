@@ -26,17 +26,20 @@ type RulesDAO struct {
 
 // Rule record, entry in mongo
 type Rule struct {
-	ID            bson.ObjectID `json:"id" bson:"_id,omitempty"`
-	Domain        string        `json:"domain"`
-	MatchURLs     []string      `json:"match_url,omitempty" bson:"match_urls,omitempty"`
-	Content       string        `json:"content"`
-	Author        string        `json:"author,omitempty" bson:"author,omitempty"`
-	TS            string        `json:"ts,omitempty" bson:"ts,omitempty"` // ts of original article
-	Excludes      []string      `json:"excludes,omitempty" bson:"excludes,omitempty"`
-	TestURLs      []string      `json:"test_urls,omitempty" bson:"test_urls"`
-	User          string        `json:"user"`
-	Enabled       bool          `json:"enabled"`
-	UseCloudflare bool          `json:"use_cloudflare,omitempty" bson:"use_cloudflare,omitempty"` // route fetch via Cloudflare Browser Rendering
+	ID     bson.ObjectID `json:"id" bson:"_id,omitempty"`
+	Domain string        `json:"domain"`
+	// bson tags for the form-editable fields below deliberately omit "omitempty": Save does a $set
+	// of the whole struct, so a zero value (empty slice, false checkbox) must overwrite and clear
+	// the stored value rather than be dropped, leaving it stuck at its previous non-zero state.
+	MatchURLs     []string `json:"match_url,omitempty" bson:"match_urls"`
+	Content       string   `json:"content"`
+	Author        string   `json:"author,omitempty" bson:"author,omitempty"`
+	TS            string   `json:"ts,omitempty" bson:"ts,omitempty"` // ts of original article
+	Excludes      []string `json:"excludes,omitempty" bson:"excludes"`
+	TestURLs      []string `json:"test_urls,omitempty" bson:"test_urls"`
+	User          string   `json:"user"`
+	Enabled       bool     `json:"enabled"`
+	UseCloudflare bool     `json:"use_cloudflare,omitempty" bson:"use_cloudflare"` // route fetch via Cloudflare Browser Rendering
 }
 
 // Get rule by url. Checks if found in mongo, matching by domain
@@ -73,6 +76,17 @@ func (r RulesDAO) GetByID(ctx context.Context, id bson.ObjectID) (Rule, bool) {
 
 // Save upsert rule
 func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
+	// normalise nil slices to empty ones so cleared multi-value fields are stored as BSON arrays
+	// ([]) rather than null (the driver encodes nil slices as null), keeping the stored type stable.
+	if rule.MatchURLs == nil {
+		rule.MatchURLs = []string{}
+	}
+	if rule.Excludes == nil {
+		rule.Excludes = []string{}
+	}
+	if rule.TestURLs == nil {
+		rule.TestURLs = []string{}
+	}
 	ch, err := r.UpdateOne(ctx, bson.M{fieldDomain: rule.Domain}, bson.M{opSet: rule}, options.UpdateOne().SetUpsert(true))
 	if err != nil {
 		log.Printf("[WARN] failed to save, error=%v, article=%v", err, rule)

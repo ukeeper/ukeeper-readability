@@ -534,6 +534,28 @@ func TestServer_SaveRule(t *testing.T) {
 	assert.Contains(t, string(body), "Failed to parse form")
 }
 
+func TestServer_SaveRuleTrimsLines(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+
+	domain := randStringBytesRmndr(42) + ".com"
+	// browsers submit textarea content with \r\n line endings and often a trailing blank line;
+	// %0D%0A is the url-encoded \r\n, %0A a bare \n
+	body := "domain=" + domain +
+		"&content=article" +
+		"&match_url=a.com%0D%0Ab.com%0D%0A%0D%0A" +
+		"&test_urls=http://x.com%0D%0A%0D%0Ahttp://y.com%0A"
+	resp, err := postFormUrlencoded(t, ts.URL+"/api/rule", body)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var rule datastore.Rule
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&rule))
+	assert.Equal(t, []string{"a.com", "b.com"}, rule.MatchURLs, "no \\r suffixes or empty entries")
+	assert.Equal(t, []string{"http://x.com", "http://y.com"}, rule.TestURLs)
+}
+
 func TestServer_Preview(t *testing.T) {
 	ts, _ := startupT(t)
 	defer ts.Close()
