@@ -4,6 +4,7 @@ package extractor
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -37,9 +38,15 @@ type UReadability struct {
 	Retriever   Retriever // default retriever; when nil a cached HTTPRetriever is used
 	CFRetriever Retriever // optional Cloudflare Browser Rendering retriever; when set, enables routing
 	CFRouteAll  bool      // route every request through CFRetriever (requires CFRetriever != nil)
+	// BlockPrivateNetworks rejects image fetches to non-public addresses. Guards image extraction
+	// against SSRF; set together with HTTPRetriever.BlockPrivateNetworks in public deployments.
+	BlockPrivateNetworks bool
 
 	defaultRetrieverOnce sync.Once
 	defaultRetriever     Retriever
+
+	imgClientOnce sync.Once
+	imgClient     *http.Client
 }
 
 // retriever returns the configured default Retriever, creating a cached HTTPRetriever if nil
@@ -48,7 +55,7 @@ func (f *UReadability) retriever() Retriever {
 		return f.Retriever
 	}
 	f.defaultRetrieverOnce.Do(func() {
-		f.defaultRetriever = &HTTPRetriever{Timeout: f.TimeOut}
+		f.defaultRetriever = &HTTPRetriever{Timeout: f.TimeOut, BlockPrivateNetworks: f.BlockPrivateNetworks}
 	})
 	return f.defaultRetriever
 }
@@ -108,6 +115,18 @@ func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *d
 func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	log.Printf("[INFO] extract %s", reqURL)
 	rb := &Response{}
+
+	// enforce the SSRF policy before any retriever runs, so it also vets the submitted host on the
+	// Cloudflare path (which fetches remotely and isn't guarded by the connect-time dialer). the HTTP
+	// retriever additionally re-checks at connect time, defending against DNS rebinding and redirects
+	// between this lookup and the dial; the Cloudflare path can't be redirect-guarded from here, but
+	// it fetches on Cloudflare's infrastructure and so cannot reach this service's own internal network.
+	if f.BlockPrivateNetworks {
+		if err := validatePublicHost(ctx, reqURL); err != nil {
+			log.Printf("[WARN] blocked fetch of %s: %v", reqURL, err)
+			return nil, err
+		}
+	}
 
 	// look up a rule by domain once up front (unless one was explicitly passed) so retriever
 	// selection and getContent share the same lookup instead of paying for two round-trips.

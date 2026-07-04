@@ -30,7 +30,9 @@ var opts struct {
 	CFAccountID string            `long:"cf-account-id" env:"CF_ACCOUNT_ID" description:"Cloudflare account ID for Browser Rendering API"`
 	CFAPIToken  string            `long:"cf-api-token" env:"CF_API_TOKEN" description:"Cloudflare API token with Browser Rendering Edit permission"`
 	CFRouteAll  bool              `long:"cf-route-all" env:"CF_ROUTE_ALL" description:"route every request through Cloudflare Browser Rendering (requires cf-account-id and cf-api-token)"`
-	Debug       bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
+	//nolint:lll // struct tag with env and description
+	AllowPrivateNetworks bool `long:"allow-private-networks" env:"ALLOW_PRIVATE_NETWORKS" description:"allow fetching URLs that resolve to loopback/private/link-local addresses (disables SSRF guard; enable only for trusted intranet use)"`
+	Debug                bool `long:"dbg" env:"DEBUG" description:"debug mode"`
 }
 
 func main() {
@@ -51,9 +53,15 @@ func main() {
 	}
 	stores := db.GetStores()
 
+	// block SSRF to non-public addresses by default; operators can opt out for trusted intranet use.
+	blockPrivate := !opts.AllowPrivateNetworks
+	if opts.AllowPrivateNetworks {
+		log.Print("[WARN] private-network SSRF guard disabled via --allow-private-networks")
+	}
+
 	// default retriever is always HTTP; CF is optional and, when configured, acts as a
 	// second retriever available for per-rule routing or global route-all.
-	httpRetriever := &extractor.HTTPRetriever{Timeout: 30 * time.Second}
+	httpRetriever := &extractor.HTTPRetriever{Timeout: 30 * time.Second, BlockPrivateNetworks: blockPrivate}
 	var cfRetriever extractor.Retriever
 	if opts.CFAccountID != "" && opts.CFAPIToken != "" {
 		cfRetriever = &extractor.CloudflareRetriever{
@@ -79,12 +87,13 @@ func main() {
 
 	srv := rest.Server{
 		Readability: extractor.UReadability{
-			TimeOut:     30 * time.Second,
-			SnippetSize: 300,
-			Rules:       stores.Rules,
-			Retriever:   httpRetriever,
-			CFRetriever: cfRetriever,
-			CFRouteAll:  opts.CFRouteAll,
+			TimeOut:              30 * time.Second,
+			SnippetSize:          300,
+			Rules:                stores.Rules,
+			Retriever:            httpRetriever,
+			CFRetriever:          cfRetriever,
+			CFRouteAll:           opts.CFRouteAll,
+			BlockPrivateNetworks: blockPrivate,
 		},
 		Token:       opts.Token,
 		Credentials: opts.Credentials,

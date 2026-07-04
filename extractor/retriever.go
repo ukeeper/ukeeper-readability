@@ -32,6 +32,9 @@ type RetrieveResult struct {
 // HTTPRetriever fetches pages using a standard HTTP client
 type HTTPRetriever struct {
 	Timeout time.Duration
+	// BlockPrivateNetworks rejects fetches that resolve to loopback, private, link-local or other
+	// non-public addresses. Guards against SSRF via user-supplied URLs; enable in public deployments.
+	BlockPrivateNetworks bool
 
 	once   sync.Once
 	client *http.Client
@@ -46,6 +49,9 @@ func (h *HTTPRetriever) httpClient() *http.Client {
 			timeout = httpDefaultTimeout
 		}
 		h.client = &http.Client{Timeout: timeout}
+		if h.BlockPrivateNetworks {
+			h.client.Transport = safeTransport(timeout)
+		}
 	})
 	return h.client
 }
