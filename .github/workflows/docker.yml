@@ -60,6 +60,8 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,scope=${{ matrix.platform }},mode=max,ignore-error=true
           build-args: |
             CI=github
             GITHUB_SHA=${{ github.event.workflow_run.head_sha }}
@@ -73,6 +75,8 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
+          # reuse the layers the ghcr build just cached so this is a cache hit, not a full rebuild
+          cache-from: type=gha,scope=${{ matrix.platform }}
           build-args: |
             CI=github
             GITHUB_SHA=${{ github.event.workflow_run.head_sha }}
