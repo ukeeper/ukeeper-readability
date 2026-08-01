@@ -5,15 +5,15 @@ go 1.25.0
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/go-pkgz/lgr v0.12.3
-	github.com/go-pkgz/rest v1.21.0
+	github.com/go-pkgz/rest v1.23.1
 	github.com/go-pkgz/routegroup v1.6.0
 	github.com/go-pkgz/testutils v0.6.0
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/kennygrant/sanitize v1.2.4
 	github.com/mauidude/go-readability v0.0.0-20220221173116-a9b3620098b7
 	github.com/stretchr/testify v1.11.1
-	go.mongodb.org/mongo-driver/v2 v2.7.0
-	golang.org/x/net v0.56.0
+	go.mongodb.org/mongo-driver/v2 v2.8.0
+	golang.org/x/net v0.57.0
 )
 
 require (
@@ -95,9 +95,9 @@ require (
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
