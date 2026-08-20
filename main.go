@@ -19,18 +19,21 @@ import (
 var revision string
 
 var opts struct {
-	Address     string            `long:"address" env:"UKEEPER_ADDRESS" default:"" description:"listening address"`
-	Port        int               `long:"port" env:"UKEEPER_PORT" default:"8080" description:"port"`
-	FrontendDir string            `long:"frontend-dir" env:"FRONTEND_DIR" default:"/srv/web" description:"directory with frontend templates and static/ directory for static assets"`
-	Credentials map[string]string `long:"creds" env:"CREDS" description:"credentials for protected calls (POST, DELETE /rules)"`
-	Token       string            `long:"token" env:"UKEEPER_TOKEN" description:"token for API endpoint auth"`
-	MongoURI    string            `short:"m" long:"mongo-uri" env:"MONGO_URI" required:"true" description:"MongoDB connection string"`
-	MongoDelay  time.Duration     `long:"mongo-delay" env:"MONGO_DELAY" default:"0" description:"mongo initial delay"`
-	MongoDB     string            `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
-	CFAccountID string            `long:"cf-account-id" env:"CF_ACCOUNT_ID" description:"Cloudflare account ID for Browser Rendering API"`
-	CFAPIToken  string            `long:"cf-api-token" env:"CF_API_TOKEN" description:"Cloudflare API token with Browser Rendering Edit permission"`
-	CFRouteAll  bool              `long:"cf-route-all" env:"CF_ROUTE_ALL" description:"route every request through Cloudflare Browser Rendering (requires cf-account-id and cf-api-token)"`
-	Debug       bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
+	Address      string            `long:"address" env:"UKEEPER_ADDRESS" default:"" description:"listening address"`
+	Port         int               `long:"port" env:"UKEEPER_PORT" default:"8080" description:"port"`
+	FrontendDir  string            `long:"frontend-dir" env:"FRONTEND_DIR" default:"/srv/web" description:"directory with frontend templates and static/ directory for static assets"`
+	Credentials  map[string]string `long:"creds" env:"CREDS" description:"credentials for protected calls (POST, DELETE /rules)"`
+	Token        string            `long:"token" env:"UKEEPER_TOKEN" description:"token for API endpoint auth"`
+	MongoURI     string            `short:"m" long:"mongo-uri" env:"MONGO_URI" required:"true" description:"MongoDB connection string"`
+	MongoDelay   time.Duration     `long:"mongo-delay" env:"MONGO_DELAY" default:"0" description:"mongo initial delay"`
+	MongoDB      string            `long:"mongo-db" env:"MONGO_DB" default:"ureadability" description:"mongo database name"`
+	CFAccountID  string            `long:"cf-account-id" env:"CF_ACCOUNT_ID" description:"Cloudflare account ID for Browser Rendering API"`
+	CFAPIToken   string            `long:"cf-api-token" env:"CF_API_TOKEN" description:"Cloudflare API token with Browser Rendering Edit permission"`
+	CFRouteAll   bool              `long:"cf-route-all" env:"CF_ROUTE_ALL" description:"route every request through Cloudflare Browser Rendering (requires cf-account-id and cf-api-token)"`
+	OpenAIKey    string            `long:"openai-api-key" env:"OPENAI_API_KEY" description:"OpenAI API key; enables auto-evaluation when set"`
+	OpenAIModel  string            `long:"openai-model" env:"OPENAI_MODEL" default:"gpt-5.4-mini" description:"OpenAI model for evaluation"`
+	OpenAIMaxItr int               `long:"openai-max-iter" env:"OPENAI_MAX_ITER" default:"3" description:"max evaluation iterations per extraction"`
+	Debug        bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
 }
 
 func main() {
@@ -89,6 +92,17 @@ func main() {
 		Token:       opts.Token,
 		Credentials: opts.Credentials,
 		Version:     revision,
+	}
+
+	if opts.OpenAIKey != "" {
+		srv.Readability.AIEvaluator = &extractor.OpenAIEvaluator{
+			APIKey: opts.OpenAIKey,
+			Model:  opts.OpenAIModel,
+		}
+		srv.Readability.MaxGPTIter = opts.OpenAIMaxItr
+		log.Printf("[INFO] OpenAI evaluation enabled, model=%s, max-iter=%d", opts.OpenAIModel, opts.OpenAIMaxItr)
+	} else {
+		log.Print("[INFO] OpenAI evaluation disabled (no API key)")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
