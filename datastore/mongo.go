@@ -54,7 +54,7 @@ func (m *MongoServer) GetStores() Stores {
 	sIndexes := []mongo.IndexModel{
 		{Keys: bson.D{{Key: "created_at", Value: 1}}},
 		{Keys: bson.D{{Key: "model", Value: 1}}},
-		{Keys: bson.D{{Key: "expires_at", Value: 1}}}, // index for cleaning up expired summaries
+		{Keys: bson.D{{Key: fieldExpiresAt, Value: 1}}}, // index for cleaning up expired summaries
 	}
 
 	return Stores{

@@ -33,7 +33,7 @@ type SummariesDAO struct {
 // Get returns summary by content hash
 func (s SummariesDAO) Get(ctx context.Context, content string) (Summary, bool) {
 	contentHash := GenerateContentHash(content)
-	res := s.Collection.FindOne(ctx, bson.M{"_id": contentHash})
+	res := s.Collection.FindOne(ctx, bson.M{fieldID: contentHash})
 	if res.Err() != nil {
 		if res.Err() == mongo.ErrNoDocuments {
 			return Summary{}, false
@@ -70,7 +70,7 @@ func (s SummariesDAO) Save(ctx context.Context, summary Summary) error {
 	opts := options.UpdateOne().SetUpsert(true)
 	_, err := s.Collection.UpdateOne(
 		ctx,
-		bson.M{"_id": summary.ID},
+		bson.M{fieldID: summary.ID},
 		bson.M{"$set": summary},
 		opts,
 	)
@@ -82,7 +82,7 @@ func (s SummariesDAO) Save(ctx context.Context, summary Summary) error {
 
 // Delete removes summary from the database
 func (s SummariesDAO) Delete(ctx context.Context, contentHash string) error {
-	_, err := s.Collection.DeleteOne(ctx, bson.M{"_id": contentHash})
+	_, err := s.Collection.DeleteOne(ctx, bson.M{fieldID: contentHash})
 	if err != nil {
 		return fmt.Errorf("failed to delete summary: %w", err)
 	}
@@ -94,7 +94,7 @@ func (s SummariesDAO) CleanupExpired(ctx context.Context) (int64, error) {
 	now := time.Now()
 	result, err := s.Collection.DeleteMany(
 		ctx,
-		bson.M{"expires_at": bson.M{"$lt": now}},
+		bson.M{fieldExpiresAt: bson.M{"$lt": now}},
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to cleanup expired summaries: %w", err)
