@@ -54,6 +54,8 @@ linters:
           disabled: true
         - name: nested-structs
           disabled: true
+        - name: max-public-structs
+          arguments: [6]
         - name: use-slices-sort
           disabled: true
     gocritic:

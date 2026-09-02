@@ -3,6 +3,11 @@
     <div class="preview__tip">Анонс:</div>
     <p class="preview__data">{{.Excerpt}}</p>
 
+  {{if .Summary}}
+    <div class="preview__tip">Сводка:</div>
+    <p class="preview__data">{{.Summary}}</p>
+  {{end}}
+
     <div class="preview__tip">Полный контент с тегами:</div>
     <div class="preview__data">{{.Rich }}</div>
 
