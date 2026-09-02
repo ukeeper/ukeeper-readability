@@ -21,7 +21,6 @@ var revision string
 // OpenAIGroup contains settings for OpenAI integration
 type OpenAIGroup struct {
 	DisableSummaries  bool          `long:"disable-summaries" env:"DISABLE_SUMMARIES" description:"disable summary generation with OpenAI"`
-	APIKey            string        `long:"api-key" env:"API_KEY" description:"OpenAI API key for summary generation"`
 	ModelType         string        `long:"model-type" env:"MODEL_TYPE" default:"gpt-4o-mini" description:"OpenAI model name for summary generation (e.g., gpt-4o, gpt-4o-mini)"`
 	SummaryPrompt     string        `long:"summary-prompt" env:"SUMMARY_PROMPT" description:"custom prompt for summary generation"`
 	MaxContentLength  int           `long:"max-content-length" env:"MAX_CONTENT_LENGTH" default:"10000" description:"maximum content length to send to OpenAI API (0 for no limit)"`
@@ -41,9 +40,10 @@ var opts struct {
 	CFAccountID  string            `long:"cf-account-id" env:"CF_ACCOUNT_ID" description:"Cloudflare account ID for Browser Rendering API"`
 	CFAPIToken   string            `long:"cf-api-token" env:"CF_API_TOKEN" description:"Cloudflare API token with Browser Rendering Edit permission"`
 	CFRouteAll   bool              `long:"cf-route-all" env:"CF_ROUTE_ALL" description:"route every request through Cloudflare Browser Rendering (requires cf-account-id and cf-api-token)"`
-	OpenAIKey    string            `long:"openai-api-key" env:"OPENAI_API_KEY" description:"OpenAI API key; enables auto-evaluation when set"`
+	OpenAIKey    string            `long:"openai-api-key" env:"OPENAI_API_KEY" description:"OpenAI API key, shared by auto-evaluation and summaries"`
 	OpenAIModel  string            `long:"openai-model" env:"OPENAI_MODEL" default:"gpt-5.4-mini" description:"OpenAI model for evaluation"`
 	OpenAIMaxItr int               `long:"openai-max-iter" env:"OPENAI_MAX_ITER" default:"3" description:"max evaluation iterations per extraction"`
+	OpenAINoEval bool              `long:"openai-disable-eval" env:"OPENAI_DISABLE_EVAL" description:"disable extraction auto-evaluation with OpenAI"`
 	Debug        bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
 
 	OpenAI OpenAIGroup `group:"openai" namespace:"openai" env-namespace:"OPENAI" description:"OpenAI integration settings"`
@@ -93,12 +93,6 @@ func main() {
 		log.Print("[INFO] using default HTTP retriever")
 	}
 
-	// determine the OpenAI API key — use the dedicated summary key if set, fall back to the evaluation key
-	openAIKeyForSummaries := opts.OpenAI.APIKey
-	if openAIKeyForSummaries == "" {
-		openAIKeyForSummaries = opts.OpenAIKey
-	}
-
 	srv := rest.Server{
 		Readability: extractor.UReadability{
 			TimeOut:          30 * time.Second,
@@ -108,7 +102,7 @@ func main() {
 			CFRetriever:      cfRetriever,
 			CFRouteAll:       opts.CFRouteAll,
 			Summaries:        stores.Summaries,
-			OpenAIKey:        openAIKeyForSummaries,
+			OpenAIKey:        opts.OpenAIKey,
 			ModelType:        opts.OpenAI.ModelType,
 			OpenAIEnabled:    !opts.OpenAI.DisableSummaries,
 			SummaryPrompt:    opts.OpenAI.SummaryPrompt,
@@ -120,15 +114,18 @@ func main() {
 		Version:     revision,
 	}
 
-	if opts.OpenAIKey != "" {
+	switch {
+	case opts.OpenAIKey == "":
+		log.Print("[INFO] OpenAI evaluation disabled (no API key)")
+	case opts.OpenAINoEval:
+		log.Print("[INFO] OpenAI evaluation disabled by --openai-disable-eval")
+	default:
 		srv.Readability.AIEvaluator = &extractor.OpenAIEvaluator{
 			APIKey: opts.OpenAIKey,
 			Model:  opts.OpenAIModel,
 		}
 		srv.Readability.MaxGPTIter = opts.OpenAIMaxItr
 		log.Printf("[INFO] OpenAI evaluation enabled, model=%s, max-iter=%d", opts.OpenAIModel, opts.OpenAIMaxItr)
-	} else {
-		log.Print("[INFO] OpenAI evaluation disabled (no API key)")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
