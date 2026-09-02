@@ -19,16 +19,19 @@
 | cf-account-id| CF_ACCOUNT_ID   | none           | Cloudflare account ID for Browser Rendering API       |
 | cf-api-token | CF_API_TOKEN    | none           | Cloudflare API token with Browser Rendering Edit perm |
 | cf-route-all | CF_ROUTE_ALL    | `false`        | route every request through Cloudflare Browser Rendering |
-| openai-api-key | OPENAI_API_KEY | none          | OpenAI API key; enables auto-evaluation when set      |
+| openai-api-key | OPENAI_API_KEY | none          | OpenAI API key, shared by auto-evaluation and summaries |
 | openai-model | OPENAI_MODEL    | `gpt-5.4-mini` | OpenAI model for evaluation                           |
 | openai-max-iter | OPENAI_MAX_ITER | `3`         | max evaluation iterations per extraction               |
+| openai-disable-eval | OPENAI_DISABLE_EVAL | `false` | disable extraction auto-evaluation                    |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
 
 #### OpenAI integration
 
+The API key is set once with `--openai-api-key`; the two OpenAI features share it and are switched off
+independently with `--openai-disable-eval` and `--openai.disable-summaries`.
+
 | Command line                  | Environment                | Default       | Description                                                      |
 |-------------------------------|----------------------------|---------------|------------------------------------------------------------------|
-| openai.api-key                | OPENAI_API_KEY             | none          | OpenAI API key for summary generation                            |
 | openai.model-type             | OPENAI_MODEL_TYPE          | `gpt-4o-mini` | OpenAI model name (e.g., gpt-4o, gpt-4o-mini)                   |
 | openai.disable-summaries      | OPENAI_DISABLE_SUMMARIES   | `false`       | disable summary generation                                       |
 | openai.summary-prompt         | OPENAI_SUMMARY_PROMPT      | built-in      | custom prompt for summary generation                             |
@@ -47,7 +50,7 @@ When Cloudflare credentials are not set, the service uses a standard HTTP client
 
 ### OpenAI Auto-Evaluation (optional)
 
-When `--openai-api-key` is set, the service automatically evaluates extraction quality using OpenAI. If the extracted content looks poor (missing article body, too short, mostly boilerplate), GPT suggests a CSS selector targeting the main content. The service iterates up to `--openai-max-iter` times, saving the best selector as a rule for future use.
+When `--openai-api-key` is set and `--openai-disable-eval` is not, the service automatically evaluates extraction quality using OpenAI. If the extracted content looks poor (missing article body, too short, mostly boilerplate), GPT suggests a CSS selector targeting the main content. The service iterates up to `--openai-max-iter` times, saving the best selector as a rule for future use.
 
 Evaluation only runs for domains without an existing extraction rule. For domains that already have rules, use the force-mode endpoint to re-evaluate:
 
@@ -56,6 +59,8 @@ Evaluation only runs for domains without an existing extraction rule. For domain
 This protected endpoint (requires basicAuth credentials) ignores the stored rule, re-extracts with the general parser, and runs the evaluation loop to find a better selector.
 
 When OpenAI is not configured, extraction works exactly as before — no GPT calls are made.
+Setting the key enables both auto-evaluation and summaries; disable either one on its own with
+`--openai-disable-eval` or `--openai.disable-summaries`.
 
 ### API
 

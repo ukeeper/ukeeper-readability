@@ -901,6 +901,46 @@ func postFormUrlencoded(t *testing.T, url, body string) (*http.Response, error) 
 	return client.Do(req)
 }
 
+func TestServer_HandleMetrics(t *testing.T) {
+	ts, _ := startupT(t)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/api/metrics")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var res struct {
+		Summary struct {
+			CacheHits         int64   `json:"cache_hits"`
+			CacheMisses       int64   `json:"cache_misses"`
+			CacheHitRatio     float64 `json:"cache_hit_ratio"`
+			TotalRequests     int64   `json:"total_requests"`
+			FailedRequests    int64   `json:"failed_requests"`
+			AverageResponseMs int64   `json:"average_response_ms"`
+			SuccessRate       float64 `json:"success_rate"`
+		} `json:"summary"`
+		Version string `json:"version"`
+		Time    string `json:"time"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&res))
+
+	// no summary has been generated, so every counter is zero and neither ratio divides by zero.
+	// success_rate reads 0 rather than 1 on an idle instance, since the handler divides
+	// (total-failed) by max(1, total)
+	assert.Equal(t, int64(0), res.Summary.CacheHits)
+	assert.Equal(t, int64(0), res.Summary.CacheMisses)
+	assert.InDelta(t, 0.0, res.Summary.CacheHitRatio, 0.0001)
+	assert.Equal(t, int64(0), res.Summary.TotalRequests)
+	assert.Equal(t, int64(0), res.Summary.FailedRequests)
+	assert.Equal(t, int64(0), res.Summary.AverageResponseMs)
+	assert.InDelta(t, 0.0, res.Summary.SuccessRate, 0.0001)
+	assert.Equal(t, "dev-test", res.Version)
+
+	_, err = time.Parse(time.RFC3339, res.Time)
+	assert.NoError(t, err)
+}
+
 // startupT runs fully configured testing server with in-memory rules store
 func startupT(t *testing.T) (*httptest.Server, *Server) {
 	t.Helper()
