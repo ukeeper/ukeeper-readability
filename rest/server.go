@@ -187,15 +187,12 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 // extractArticleEmulateReadability emulates readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
-	token := r.URL.Query().Get("token")
-	summary, _ := strconv.ParseBool(r.URL.Query().Get("summary"))
-
-	if s.Token != "" && token == "" {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
+	if !s.checkToken(w, r) {
 		return
 	}
+	summary, _ := strconv.ParseBool(r.URL.Query().Get("summary"))
 
-	// check if summary is requested but token is not provided, or api key is not set
+	// check if summary is requested but token is not set for the server, or api key is not set
 	if summary {
 		if s.Readability.OpenAIKey == "" {
 			rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "OpenAI key is not set")
@@ -206,11 +203,6 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 				"summary generation requires token, but token is not set for the server")
 			return
 		}
-	}
-
-	if s.Token != "" && s.Token != token {
-		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
-		return
 	}
 
 	extractURL := r.URL.Query().Get("url")
@@ -450,6 +442,21 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		"version": s.Version,
 		"time":    time.Now().Format(time.RFC3339),
 	})
+}
+
+// checkToken validates the token query parameter if the server has a token configured.
+// returns true if auth passed, false if the request was rejected.
+func (s *Server) checkToken(w http.ResponseWriter, r *http.Request) bool {
+	token := r.URL.Query().Get("token")
+	if s.Token != "" && token == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusExpectationFailed, nil, "no token passed")
+		return false
+	}
+	if s.Token != "" && subtle.ConstantTimeCompare([]byte(s.Token), []byte(token)) == 0 {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnauthorized, nil, "wrong token passed")
+		return false
+	}
+	return true
 }
 
 func getBid(id string) bson.ObjectID {

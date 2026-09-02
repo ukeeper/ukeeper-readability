@@ -754,6 +754,17 @@ func TestServer_ExtractArticleEmulateReadabilityWithSummaryFailures(t *testing.T
 			openAIKey:      "test key",
 		},
 		{
+			// auth must complete before the summary pre-checks, otherwise a wrong token
+			// gets 400 "OpenAI key is not set" and learns whether a key is configured
+			name:           "invalid token, summary requested, no OpenAI key",
+			serverToken:    "secret",
+			url:            ts.URL,
+			token:          "wrong",
+			summary:        true,
+			expectedStatus: http.StatusUnauthorized,
+			expectedError:  "wrong token passed",
+		},
+		{
 			name:           "valid token, no summary",
 			serverToken:    "secret",
 			url:            ts.URL,
