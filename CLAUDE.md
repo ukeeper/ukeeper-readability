@@ -10,7 +10,7 @@ ukeeper-readability is a Go web service that extracts article content from URLs 
 
 ```bash
 go build -o ukeeper-readability .
-go test -timeout=60s -race ./...              # all tests (datastore tests use testcontainers)
+go test -timeout=60s -race ./...              # all tests (datastore rules tests use testcontainers)
 go test -timeout=60s -run TestName ./rest/     # single test
 golangci-lint run --max-issues-per-linter=0 --max-same-issues=0  # lint from repo root
 ```
@@ -21,15 +21,15 @@ Optional Cloudflare Browser Rendering flags (when both are set, uses `Cloudflare
 - `--cf-account-id` / `CF_ACCOUNT_ID` — Cloudflare account ID
 - `--cf-api-token` / `CF_API_TOKEN` — Cloudflare API token with Browser Rendering Edit permission
 
-`main_test.go` is gated behind `ENABLE_MONGO_TESTS=true` and needs MongoDB on localhost:27017. All other packages test independently — `datastore/` spins up MongoDB via testcontainers automatically.
+`main_test.go` and `datastore/summaries_test.go` are gated behind `ENABLE_MONGO_TESTS=true` and need MongoDB on localhost:27017 — without it the summaries tests skip silently. `datastore/rules_test.go` spins up MongoDB via testcontainers and needs no env var. CI sets `ENABLE_MONGO_TESTS=true` with a Mongo service, so the gap is local only.
 
 ## Architecture
 
 ```
 main.go        → CLI flags (jessevdk/go-flags), wiring, startup
-datastore/     → MongoDB access (RulesDAO, Rule struct)
+datastore/     → MongoDB access (RulesDAO/Rule, SummariesDAO/Summary)
 extractor/     → URL fetching, content extraction, charset conversion
-  mocks/       → moq-generated mock for Rules interface
+  mocks/       → moq-generated mocks for Rules, Summaries, OpenAIClient
 rest/          → HTTP server, routing (go-pkgz/routegroup), handlers, basicAuth
 web/           → Go HTML templates (HTMX v2), static assets
 ```
@@ -40,6 +40,8 @@ web/           → Go HTML templates (HTMX v2), static assets
 - `extractor.Rules` (defined consumer-side in `extractor/readability.go`), implemented by `datastore.RulesDAO`. Mock generated with `//go:generate moq` in extractor package.
 - `extractor.Retriever` (defined in `extractor/retriever.go`) — abstracts URL content fetching. Two implementations: `HTTPRetriever` (default, standard HTTP GET with Safari user-agent) and `CloudflareRetriever` (Cloudflare Browser Rendering API for JS-rendered pages). When `UReadability.Retriever` is nil, defaults to `HTTPRetriever`.
 - `extractor.AIEvaluator` (defined in `extractor/evaluator.go`) — evaluates extraction quality via OpenAI. Implementation: `OpenAIEvaluator`. Mock generated with `//go:generate moq` as test-only mock (`evaluator_mock_test.go`).
+- `extractor.Summaries` (defined in `extractor/readability.go`), implemented by `datastore.SummariesDAO` — cache for generated article summaries. Mock in `extractor/mocks/summaries.go`.
+- `extractor.OpenAIClient` (defined in `extractor/readability.go`) — the summary-generation calls, satisfied by the `go-openai` client. Mock in `extractor/mocks/openai_client.go`.
 
 ## Content Extraction Flow
 
@@ -53,10 +55,12 @@ web/           → Go HTML templates (HTMX v2), static assets
 
 `ExtractAndImprove()` is the force-mode entry point — ignores stored rules, re-extracts with general parser, then evaluates. Used by the `/api/content-parsed-wrong` protected endpoint.
 
-Optional OpenAI flags (when `--openai-api-key` is set, enables auto-evaluation):
-- `--openai-api-key` / `OPENAI_API_KEY` — OpenAI API key
+Optional OpenAI flags. One key powers both auto-evaluation and summaries; each is switched off on its own:
+- `--openai-api-key` / `OPENAI_API_KEY` — OpenAI API key, shared by both features
 - `--openai-model` / `OPENAI_MODEL` — model for evaluation (default: `gpt-5.4-mini`)
 - `--openai-max-iter` / `OPENAI_MAX_ITER` — max evaluation iterations (default: `3`)
+- `--openai-disable-eval` / `OPENAI_DISABLE_EVAL` — disable auto-evaluation
+- the `--openai.*` group (`disable-summaries`, `model-type`, `summary-prompt`, `max-content-length`, `requests-per-minute`, `cleanup-interval`) configures summaries; see README for the full table
 
 ## Key Conventions
 

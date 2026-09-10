@@ -13,10 +13,11 @@ import (
 
 // mongo field names and operators reused across queries
 const (
-	fieldDomain  = "domain"
-	fieldEnabled = "enabled"
-	fieldID      = "_id"
-	opSet        = "$set"
+	fieldDomain    = "domain"
+	fieldEnabled   = "enabled"
+	fieldID        = "_id"
+	fieldExpiresAt = "expires_at"
+	opSet          = "$set"
 )
 
 // RulesDAO data-access obj for custom parsing rules, implements Rules
