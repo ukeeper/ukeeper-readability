@@ -236,7 +236,7 @@ github.com/jlaffaye/ftp
 # github.com/kennygrant/sanitize v1.2.4
 ## explicit
 github.com/kennygrant/sanitize
-# github.com/klauspost/compress v1.18.7
+# github.com/klauspost/compress v1.19.2
 ## explicit; go 1.24
 github.com/klauspost/compress
 github.com/klauspost/compress/fse
@@ -344,7 +344,7 @@ github.com/shirou/gopsutil/v4/process
 # github.com/sirupsen/logrus v1.9.4
 ## explicit; go 1.17
 github.com/sirupsen/logrus
-# github.com/stretchr/testify v1.12.0
+# github.com/stretchr/testify v1.12.1
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
@@ -431,8 +431,8 @@ go.mongodb.org/mongo-driver/x/mongo/driver/operation
 go.mongodb.org/mongo-driver/x/mongo/driver/session
 go.mongodb.org/mongo-driver/x/mongo/driver/topology
 go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage
-# go.mongodb.org/mongo-driver/v2 v2.8.2
-## explicit; go 1.19
+# go.mongodb.org/mongo-driver/v2 v2.9.1
+## explicit; go 1.25.0
 go.mongodb.org/mongo-driver/v2/bson
 go.mongodb.org/mongo-driver/v2/event
 go.mongodb.org/mongo-driver/v2/internal/aws
@@ -444,11 +444,13 @@ go.mongodb.org/mongo-driver/v2/internal/bsoncoreutil
 go.mongodb.org/mongo-driver/v2/internal/bsonutil
 go.mongodb.org/mongo-driver/v2/internal/codecutil
 go.mongodb.org/mongo-driver/v2/internal/credproviders
+go.mongodb.org/mongo-driver/v2/internal/credutil
 go.mongodb.org/mongo-driver/v2/internal/csfle
 go.mongodb.org/mongo-driver/v2/internal/csot
 go.mongodb.org/mongo-driver/v2/internal/decimal128
 go.mongodb.org/mongo-driver/v2/internal/driverutil
 go.mongodb.org/mongo-driver/v2/internal/handshake
+go.mongodb.org/mongo-driver/v2/internal/handshake/operation
 go.mongodb.org/mongo-driver/v2/internal/httputil
 go.mongodb.org/mongo-driver/v2/internal/logger
 go.mongodb.org/mongo-driver/v2/internal/mongoutil
@@ -478,7 +480,6 @@ go.mongodb.org/mongo-driver/v2/x/mongo/driver/mnet
 go.mongodb.org/mongo-driver/v2/x/mongo/driver/mongocrypt
 go.mongodb.org/mongo-driver/v2/x/mongo/driver/mongocrypt/options
 go.mongodb.org/mongo-driver/v2/x/mongo/driver/ocsp
-go.mongodb.org/mongo-driver/v2/x/mongo/driver/operation
 go.mongodb.org/mongo-driver/v2/x/mongo/driver/session
 go.mongodb.org/mongo-driver/v2/x/mongo/driver/topology
 go.mongodb.org/mongo-driver/v2/x/mongo/driver/wiremessage
@@ -517,8 +518,11 @@ go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
-# golang.org/x/crypto v0.55.0
-## explicit; go 1.25.0
+# go.yaml.in/yaml/v3 v3.0.5
+## explicit; go 1.16
+go.yaml.in/yaml/v3
+# golang.org/x/crypto v0.57.0
+## explicit; go 1.26.0
 golang.org/x/crypto/argon2
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blake2b
@@ -534,23 +538,23 @@ golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/net v0.58.0
-## explicit; go 1.25.0
+# golang.org/x/net v0.59.0
+## explicit; go 1.26.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
-# golang.org/x/sync v0.22.0
-## explicit; go 1.25.0
+# golang.org/x/sync v0.23.0
+## explicit; go 1.26.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.47.0
-## explicit; go 1.25.0
+# golang.org/x/sys v0.48.0
+## explicit; go 1.26.0
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/text v0.41.0
-## explicit; go 1.25.0
+# golang.org/x/text v0.42.0
+## explicit; go 1.26.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -569,6 +573,3 @@ golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
-# gopkg.in/yaml.v3 v3.0.1
-## explicit
-gopkg.in/yaml.v3
