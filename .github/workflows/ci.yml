@@ -24,10 +24,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: resolve go version
+        id: goversion
+        run: echo "spec=$(sed -n 's/^go \([0-9]*\.[0-9]*\).*/\1/p' go.mod).x" >> "$GITHUB_OUTPUT"
+
       - name: set up go
         uses: actions/setup-go@v7
         with:
-          go-version: "1.25"
+          go-version: ${{ steps.goversion.outputs.spec }}
         id: go
 
       - name: build and test
