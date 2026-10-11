@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/go-pkgz/rest"
+	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -614,6 +615,181 @@ func TestServer_Preview(t *testing.T) {
 	b, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(b), "Failed to parse form")
+}
+
+func TestServer_PreviewSummaryIsEscaped(t *testing.T) {
+	ts, srv := startupT(t)
+	defer ts.Close()
+	srv.Readability.OpenAI = &mocks.OpenAIClientMock{CreateChatCompletionFunc: summaryAnswer("first line\n<script>alert(1)</script>")}
+
+	tss := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("<html><body><article><p>Some article text for the preview.</p></article></body></html>"))
+	}))
+	defer tss.Close()
+
+	resp, err := postFormUrlencoded(t, ts.URL+"/api/preview", "test_urls="+tss.URL+"/a&content=")
+	require.NoError(t, err)
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
+
+	assert.Contains(t, string(b), "Сводка:")
+	assert.Contains(t, string(b), "first line\n&lt;script&gt;alert(1)&lt;/script&gt;")
+	assert.NotContains(t, string(b), "<script>alert(1)</script>")
+}
+
+func TestServer_ExtractWithSummary(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("<html><body><p>This is a test article.</p></body></html>"))
+	}))
+	defer ts.Close()
+
+	tests := []struct {
+		name           string
+		serverToken    string
+		token          string
+		summary        bool
+		withOpenAI     bool
+		expectedStatus int
+		expectedError  string
+	}{
+		{name: "summary, no OpenAI client", serverToken: "secret", token: "secret", summary: true,
+			expectedStatus: http.StatusBadRequest, expectedError: "OpenAI key is not set"},
+		{name: "summary, no token passed", serverToken: "secret", summary: true, withOpenAI: true,
+			expectedStatus: http.StatusExpectationFailed, expectedError: "no token passed"},
+		{name: "summary, wrong token", serverToken: "secret", token: "wrong", summary: true, withOpenAI: true,
+			expectedStatus: http.StatusUnauthorized, expectedError: "wrong token passed"},
+		{
+			// auth must complete before the summary pre-checks, otherwise a wrong token
+			// learns whether an OpenAI key is configured
+			name: "summary, wrong token, no OpenAI client", serverToken: "secret", token: "wrong", summary: true,
+			expectedStatus: http.StatusUnauthorized, expectedError: "wrong token passed",
+		},
+		{name: "summary, server has no token", token: "any", summary: true, withOpenAI: true,
+			expectedStatus: http.StatusBadRequest, expectedError: "summary generation requires token, but token is not set for the server"},
+		{name: "no summary, server has no token", expectedStatus: http.StatusOK},
+		{name: "no summary, valid token", serverToken: "secret", token: "secret", withOpenAI: true, expectedStatus: http.StatusOK},
+		{name: "summary, valid token", serverToken: "secret", token: "secret", summary: true, withOpenAI: true,
+			expectedStatus: http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &mocks.OpenAIClientMock{CreateChatCompletionFunc: summaryAnswer("This is a summary of the article.")}
+			srv := Server{Readability: extractor.UReadability{TimeOut: 30 * time.Second, SnippetSize: 300}, Token: tt.serverToken}
+			if tt.withOpenAI {
+				srv.Readability.OpenAI = client
+			}
+
+			u := "/api/content/v1/parser?url=" + ts.URL
+			if tt.token != "" {
+				u += "&token=" + tt.token
+			}
+			if tt.summary {
+				u += "&summary=true"
+			}
+			rr := httptest.NewRecorder()
+			srv.extractArticleEmulateReadability(rr, httptest.NewRequest("GET", u, http.NoBody))
+			require.Equal(t, tt.expectedStatus, rr.Code, rr.Body.String())
+
+			if tt.expectedError != "" {
+				var errResp map[string]string
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &errResp))
+				assert.Equal(t, tt.expectedError, errResp["error"])
+				assert.Empty(t, client.CreateChatCompletionCalls())
+				return
+			}
+			var res extractor.Response
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &res))
+			assert.NotEmpty(t, res.Content)
+			if tt.summary {
+				assert.Equal(t, "This is a summary of the article.", res.Summary)
+				return
+			}
+			assert.Empty(t, res.Summary)
+			assert.Empty(t, client.CreateChatCompletionCalls())
+		})
+	}
+}
+
+func TestServer_SummaryBudget(t *testing.T) {
+	orig := summaryBudget
+	summaryBudget = 200 * time.Millisecond
+	t.Cleanup(func() { summaryBudget = orig })
+
+	// a model that answers only after 2s, or gives up when its context ends
+	slowModel := func(ctx context.Context, _ openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+		select {
+		case <-ctx.Done():
+			return openai.ChatCompletionResponse{}, ctx.Err()
+		case <-time.After(2 * time.Second):
+			return summaryAnswer("late")(ctx, openai.ChatCompletionRequest{})
+		}
+	}
+	article := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("<html><body><article><p>Some article text for the budget test.</p></article></body></html>"))
+	}))
+	defer article.Close()
+
+	t.Run("parser gives up when the budget runs out", func(t *testing.T) {
+		client := &mocks.OpenAIClientMock{CreateChatCompletionFunc: slowModel}
+		srv := Server{Readability: extractor.UReadability{TimeOut: 30 * time.Second, SnippetSize: 300, OpenAI: client}, Token: "secret"}
+
+		st := time.Now()
+		rr := httptest.NewRecorder()
+		srv.extractArticleEmulateReadability(rr, httptest.NewRequest("GET", "/api/content/v1/parser?token=secret&summary=true&url="+article.URL, http.NoBody))
+		assert.Less(t, time.Since(st), time.Second)
+		assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+		assert.Len(t, client.CreateChatCompletionCalls(), 1)
+	})
+
+	t.Run("preview skips summaries once the budget runs out", func(t *testing.T) {
+		ts, srv := startupT(t)
+		defer ts.Close()
+		client := &mocks.OpenAIClientMock{CreateChatCompletionFunc: slowModel}
+		srv.Readability.OpenAI = client
+
+		st := time.Now()
+		resp, err := postFormUrlencoded(t, ts.URL+"/api/preview", "test_urls="+article.URL+"/a%0A"+article.URL+"/b&content=")
+		require.NoError(t, err)
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
+		assert.Less(t, time.Since(st), time.Second)
+		assert.Len(t, client.CreateChatCompletionCalls(), 1, "second URL must not start a model call")
+		assert.Equal(t, 2, strings.Count(string(b), `class="preview-item"`), "both previews still render")
+		assert.NotContains(t, string(b), "Сводка:")
+	})
+
+	t.Run("preview extractions spend the budget before any summary", func(t *testing.T) {
+		slowArticle := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			_, _ = w.Write([]byte("<html><body><article><p>Some article text for the budget test.</p></article></body></html>"))
+		}))
+		defer slowArticle.Close()
+		ts, srv := startupT(t)
+		defer ts.Close()
+		client := &mocks.OpenAIClientMock{CreateChatCompletionFunc: slowModel}
+		srv.Readability.OpenAI = client
+
+		urls := slowArticle.URL + "/a%0A" + slowArticle.URL + "/b%0A" + slowArticle.URL + "/c"
+		resp, err := postFormUrlencoded(t, ts.URL+"/api/preview", "test_urls="+urls+"&content=")
+		require.NoError(t, err)
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
+		assert.Equal(t, 3, strings.Count(string(b), `class="preview-item"`))
+		assert.Empty(t, client.CreateChatCompletionCalls(), "300ms of extraction exceeds the 200ms budget, so no summary may start")
+	})
+}
+
+func summaryAnswer(text string) func(context.Context, openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+	return func(context.Context, openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+		return openai.ChatCompletionResponse{Choices: []openai.ChatCompletionChoice{{Message: openai.ChatCompletionMessage{Content: text}}}}, nil
+	}
 }
 
 func get(t *testing.T, url string) (response string, statusCode int) {

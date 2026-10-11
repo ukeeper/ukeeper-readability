@@ -39,6 +39,12 @@ type UReadability struct {
 	CFRetriever Retriever // optional Cloudflare Browser Rendering retriever; when set, enables routing
 	CFRouteAll  bool      // route every request through CFRetriever (requires CFRetriever != nil)
 
+	OpenAI           OpenAIClient // enables GenerateSummary when set
+	OpenAIModel      string       // defaults to DefaultOpenAIModel
+	SummaryPrompt    string       // defaults to DefaultSummaryPrompt
+	MaxContentLength int          // max characters of article text sent for summarizing, 0 for no limit
+	Summaries        Summaries    // optional summary cache
+
 	defaultRetrieverOnce sync.Once
 	defaultRetriever     Retriever
 
@@ -75,6 +81,7 @@ func (f *UReadability) pickRetriever(rule *datastore.Rule) Retriever {
 
 // Response from api calls
 type Response struct {
+	Summary     string   `json:"summary,omitempty"`
 	Content     string   `json:"content"`
 	Rich        string   `json:"rich_content"`
 	Domain      string   `json:"domain"`

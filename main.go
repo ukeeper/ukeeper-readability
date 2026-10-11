@@ -10,6 +10,7 @@ import (
 
 	log "github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
+	"github.com/sashabaranov/go-openai"
 
 	"github.com/ukeeper/ukeeper-readability/datastore"
 	"github.com/ukeeper/ukeeper-readability/extractor"
@@ -31,6 +32,13 @@ var opts struct {
 	CFAPIToken  string            `long:"cf-api-token" env:"CF_API_TOKEN" description:"Cloudflare API token with Browser Rendering Edit permission"`
 	CFRouteAll  bool              `long:"cf-route-all" env:"CF_ROUTE_ALL" description:"route every request through Cloudflare Browser Rendering (requires cf-account-id and cf-api-token)"`
 	Debug       bool              `long:"dbg" env:"DEBUG" description:"debug mode"`
+
+	OpenAI struct {
+		APIKey           string `long:"api-key" env:"API_KEY" description:"OpenAI API key, enables article summaries"`
+		Model            string `long:"model" env:"MODEL" default:"gpt-6-luna" description:"OpenAI model"`
+		SummaryPrompt    string `long:"summary-prompt" env:"SUMMARY_PROMPT" description:"custom system prompt for summaries"`
+		MaxContentLength int    `long:"max-content-length" env:"MAX_CONTENT_LENGTH" default:"10000" description:"max characters of article text sent for summarizing (0 for no limit)"`
+	} `group:"openai" namespace:"openai" env-namespace:"OPENAI"`
 }
 
 func main() {
@@ -85,10 +93,20 @@ func main() {
 			Retriever:   httpRetriever,
 			CFRetriever: cfRetriever,
 			CFRouteAll:  opts.CFRouteAll,
+
+			OpenAIModel:      opts.OpenAI.Model,
+			SummaryPrompt:    opts.OpenAI.SummaryPrompt,
+			MaxContentLength: opts.OpenAI.MaxContentLength,
+			Summaries:        stores.Summaries,
 		},
 		Token:       opts.Token,
 		Credentials: opts.Credentials,
 		Version:     revision,
+	}
+
+	if opts.OpenAI.APIKey != "" {
+		srv.Readability.OpenAI = openai.NewClient(opts.OpenAI.APIKey)
+		log.Printf("[INFO] OpenAI summaries enabled, model=%s", opts.OpenAI.Model)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
