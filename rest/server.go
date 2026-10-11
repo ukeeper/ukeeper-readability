@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,12 @@ import (
 	"github.com/ukeeper/ukeeper-readability/datastore"
 	"github.com/ukeeper/ukeeper-readability/extractor"
 )
+
+const writeTimeout = 150 * time.Second
+
+// summaryBudget caps extraction plus summaries per request, so the response is written
+// before writeTimeout drops the connection; a var so tests can shorten it
+var summaryBudget = writeTimeout - 10*time.Second
 
 // Server is a basic rest server providing access to store and invoking parser
 type Server struct {
@@ -52,9 +59,10 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 		// are the only potentially long-running handlers (other handlers — static files, rule
 		// CRUD, /ping — finish in milliseconds and are unaffected by this ceiling). 150s covers
 		// the worst-case Cloudflare path: 1 initial request + 2 retries with 11s/22s exponential
-		// backoff + up to 30s per CF request. If extraction ever moves off the server-wide
+		// backoff + up to 30s per CF request. OpenAI summaries get only what remains of
+		// summaryBudget after extraction. If extraction ever moves off the server-wide
 		// timeout, wrap only those routes with http.TimeoutHandler instead.
-		WriteTimeout: 150 * time.Second,
+		WriteTimeout: writeTimeout,
 		IdleTimeout:  30 * time.Second,
 	}
 	go func() {
@@ -181,8 +189,23 @@ func (s *Server) extractArticle(w http.ResponseWriter, r *http.Request) {
 // extractArticleEmulateReadability emulates readability API parse - https://www.readability.com/api/content/v1/parser?token=%s&url=%s
 // if token is not set for application, it won't be checked
 func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	if !s.checkToken(w, r) {
 		return
+	}
+
+	summary, _ := strconv.ParseBool(r.URL.Query().Get("summary"))
+	if summary {
+		if s.Readability.OpenAI == nil {
+			rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "OpenAI key is not set")
+			return
+		}
+		// summaries cost money per call, so they are never served without a token
+		if s.Token == "" {
+			rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil,
+				"summary generation requires token, but token is not set for the server")
+			return
+		}
 	}
 
 	extractURL := r.URL.Query().Get("url")
@@ -197,11 +220,21 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 		return
 	}
 
+	if summary {
+		ctx, cancel := context.WithDeadline(r.Context(), start.Add(summaryBudget))
+		defer cancel()
+		if res.Summary, err = s.Readability.GenerateSummary(ctx, res.Content); err != nil {
+			rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, "can't generate summary")
+			return
+		}
+	}
+
 	rest.RenderJSON(w, &res)
 }
 
 // generates previews for the provided test URLs
 func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	err := r.ParseForm()
 	if err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
@@ -230,8 +263,21 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[WARN] failed to extract content for %s: %v", url, e)
 			continue
 		}
-
 		responses = append(responses, *result)
+	}
+
+	// summaries run after every extraction so they only spend what is left of the budget;
+	// once it is gone, the remaining previews render without a summary
+	summaryCtx, cancel := context.WithDeadline(r.Context(), start.Add(summaryBudget))
+	defer cancel()
+	for i := range responses {
+		if s.Readability.OpenAI == nil || summaryCtx.Err() != nil {
+			break
+		}
+		var e error
+		if responses[i].Summary, e = s.Readability.GenerateSummary(summaryCtx, responses[i].Content); e != nil {
+			log.Printf("[WARN] failed to generate summary for preview of %s: %v", responses[i].URL, e)
+		}
 	}
 
 	// create a new type where Rich would be type template.HTML instead of string,
@@ -241,6 +287,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 		Excerpt string
 		Rich    template.HTML
 		Content string
+		Summary string // model output, escaped by the template
 	}
 
 	results := make([]result, 0, len(responses))
@@ -252,6 +299,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			//nolint:gosec // this content is escaped by Extractor, so it's safe to use it as is
 			Rich:    template.HTML(r.Rich),
 			Content: r.Content,
+			Summary: r.Summary,
 		})
 	}
 

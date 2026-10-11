@@ -27,9 +27,9 @@ Optional Cloudflare Browser Rendering flags (when both are set, uses `Cloudflare
 
 ```
 main.go        → CLI flags (jessevdk/go-flags), wiring, startup
-datastore/     → MongoDB access (RulesDAO, Rule struct)
+datastore/     → MongoDB access (RulesDAO/Rule, SummariesDAO/Summary)
 extractor/     → URL fetching, content extraction, charset conversion
-  mocks/       → moq-generated mock for Rules interface
+  mocks/       → moq-generated mocks for Rules, Summaries, OpenAIClient
 rest/          → HTTP server, routing (go-pkgz/routegroup), handlers, basicAuth
 web/           → Go HTML templates (HTMX v2), static assets
 ```
@@ -39,6 +39,9 @@ web/           → Go HTML templates (HTMX v2), static assets
 **Key interfaces:**
 - `extractor.Rules` (defined consumer-side in `extractor/readability.go`), implemented by `datastore.RulesDAO`. Mock generated with `//go:generate moq` in extractor package.
 - `extractor.Retriever` (defined in `extractor/retriever.go`) — abstracts URL content fetching. Two implementations: `HTTPRetriever` (default, standard HTTP GET with Safari user-agent) and `CloudflareRetriever` (Cloudflare Browser Rendering API for JS-rendered pages). When `UReadability.Retriever` is nil, defaults to `HTTPRetriever`.
+- `extractor.OpenAIClient` and `extractor.Summaries` (defined in `extractor/summary.go`): the go-openai client and the summary cache (`datastore.SummariesDAO`, TTL index on `expires_at`). `UReadability.OpenAI` is set only when `--openai.api-key` is given; nil means summaries are off. Mocks in `extractor/mocks/`; moq cannot read Go 1.27 export data, so regenerate them with a newer moq or edit by hand.
+
+Optional OpenAI flags, all in the `--openai.*` group: `api-key` / `OPENAI_API_KEY` (enables summaries), `model` / `OPENAI_MODEL` (default `gpt-6-luna`), `summary-prompt`, `max-content-length` (characters, default 10000).
 
 ## Content Extraction Flow
 
