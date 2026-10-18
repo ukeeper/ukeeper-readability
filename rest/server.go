@@ -4,6 +4,7 @@ package rest
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -25,9 +26,9 @@ import (
 
 const writeTimeout = 150 * time.Second
 
-// summaryBudget caps extraction plus summaries per request, so the response is written
+// openAIBudget caps extraction plus OpenAI calls per request, so the response is written
 // before writeTimeout drops the connection; a var so tests can shorten it
-var summaryBudget = writeTimeout - 10*time.Second
+var openAIBudget = writeTimeout - 10*time.Second
 
 // Server is a basic rest server providing access to store and invoking parser
 type Server struct {
@@ -59,8 +60,8 @@ func (s *Server) Run(ctx context.Context, address string, port int, frontendDir 
 		// are the only potentially long-running handlers (other handlers — static files, rule
 		// CRUD, /ping — finish in milliseconds and are unaffected by this ceiling). 150s covers
 		// the worst-case Cloudflare path: 1 initial request + 2 retries with 11s/22s exponential
-		// backoff + up to 30s per CF request. OpenAI summaries get only what remains of
-		// summaryBudget after extraction. If extraction ever moves off the server-wide
+		// backoff + up to 30s per CF request. OpenAI calls get only what remains of
+		// openAIBudget after extraction. If extraction ever moves off the server-wide
 		// timeout, wrap only those routes with http.TimeoutHandler instead.
 		WriteTimeout: writeTimeout,
 		IdleTimeout:  30 * time.Second,
@@ -98,6 +99,7 @@ func (s *Server) routes(frontendDir string) http.Handler {
 			protectedGroup.HandleFunc("POST /rule", s.saveRule)
 			protectedGroup.HandleFunc("POST /toggle-rule/{id}", s.toggleRule)
 			protectedGroup.HandleFunc("POST /preview", s.handlePreview)
+			protectedGroup.HandleFunc("POST /content-parsed-wrong", s.contentParsedWrong)
 		})
 	})
 
@@ -221,7 +223,7 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 	}
 
 	if summary {
-		ctx, cancel := context.WithDeadline(r.Context(), start.Add(summaryBudget))
+		ctx, cancel := context.WithDeadline(r.Context(), start.Add(openAIBudget))
 		defer cancel()
 		if res.Summary, err = s.Readability.GenerateSummary(ctx, res.Content); err != nil {
 			rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, "can't generate summary")
@@ -230,6 +232,32 @@ func (s *Server) extractArticleEmulateReadability(w http.ResponseWriter, r *http
 	}
 
 	rest.RenderJSON(w, &res)
+}
+
+// contentParsedWrong asks OpenAI for a selector of the article on a page the parser got wrong.
+// The selector is stored as a disabled rule when the domain has none; it is always returned with
+// the page extracted by it, so it can be tried in the rule preview before it is enabled.
+func (s *Server) contentParsedWrong(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	extractURL := r.URL.Query().Get("url")
+	if extractURL == "" {
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "url parameter is required")
+		return
+	}
+
+	ctx, cancel := context.WithDeadline(r.Context(), start.Add(openAIBudget))
+	defer cancel()
+	res, err := s.Readability.SuggestRule(ctx, extractURL)
+	switch {
+	case errors.Is(err, extractor.ErrOpenAIDisabled):
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusBadRequest, nil, "OpenAI key is not set")
+	case errors.Is(err, extractor.ErrNoSelector):
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusUnprocessableEntity, err, "can't find a selector for this page")
+	case err != nil:
+		rest.SendErrorJSON(w, r, log.Default(), http.StatusInternalServerError, err, "can't suggest a rule")
+	default:
+		rest.RenderJSON(w, res)
+	}
 }
 
 // generates previews for the provided test URLs
@@ -268,7 +296,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 	// summaries run after every extraction so they only spend what is left of the budget;
 	// once it is gone, the remaining previews render without a summary
-	summaryCtx, cancel := context.WithDeadline(r.Context(), start.Add(summaryBudget))
+	summaryCtx, cancel := context.WithDeadline(r.Context(), start.Add(openAIBudget))
 	defer cancel()
 	for i := range responses {
 		if s.Readability.OpenAI == nil || summaryCtx.Err() != nil {

@@ -32,6 +32,9 @@ import (
 //			SaveFunc: func(ctx context.Context, rule datastore.Rule) (datastore.Rule, error) {
 //				panic("mock out the Save method")
 //			},
+//			SaveIfAbsentFunc: func(ctx context.Context, rule datastore.Rule) (bool, error) {
+//				panic("mock out the SaveIfAbsent method")
+//			},
 //		}
 //
 //		// use mockedRules in code that requires extractor.Rules
@@ -53,6 +56,9 @@ type RulesMock struct {
 
 	// SaveFunc mocks the Save method.
 	SaveFunc func(ctx context.Context, rule datastore.Rule) (datastore.Rule, error)
+
+	// SaveIfAbsentFunc mocks the SaveIfAbsent method.
+	SaveIfAbsentFunc func(ctx context.Context, rule datastore.Rule) (bool, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -89,12 +95,20 @@ type RulesMock struct {
 			// Rule is the rule argument value.
 			Rule datastore.Rule
 		}
+		// SaveIfAbsent holds details about calls to the SaveIfAbsent method.
+		SaveIfAbsent []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Rule is the rule argument value.
+			Rule datastore.Rule
+		}
 	}
-	lockAll     sync.RWMutex
-	lockDisable sync.RWMutex
-	lockGet     sync.RWMutex
-	lockGetByID sync.RWMutex
-	lockSave    sync.RWMutex
+	lockAll          sync.RWMutex
+	lockDisable      sync.RWMutex
+	lockGet          sync.RWMutex
+	lockGetByID      sync.RWMutex
+	lockSave         sync.RWMutex
+	lockSaveIfAbsent sync.RWMutex
 }
 
 // All calls AllFunc.
@@ -270,5 +284,41 @@ func (mock *RulesMock) SaveCalls() []struct {
 	mock.lockSave.RLock()
 	calls = mock.calls.Save
 	mock.lockSave.RUnlock()
+	return calls
+}
+
+// SaveIfAbsent calls SaveIfAbsentFunc.
+func (mock *RulesMock) SaveIfAbsent(ctx context.Context, rule datastore.Rule) (bool, error) {
+	if mock.SaveIfAbsentFunc == nil {
+		panic("RulesMock.SaveIfAbsentFunc: method is nil but Rules.SaveIfAbsent was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Rule datastore.Rule
+	}{
+		Ctx:  ctx,
+		Rule: rule,
+	}
+	mock.lockSaveIfAbsent.Lock()
+	mock.calls.SaveIfAbsent = append(mock.calls.SaveIfAbsent, callInfo)
+	mock.lockSaveIfAbsent.Unlock()
+	return mock.SaveIfAbsentFunc(ctx, rule)
+}
+
+// SaveIfAbsentCalls gets all the calls that were made to SaveIfAbsent.
+// Check the length with:
+//
+//	len(mockedRules.SaveIfAbsentCalls())
+func (mock *RulesMock) SaveIfAbsentCalls() []struct {
+	Ctx  context.Context
+	Rule datastore.Rule
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Rule datastore.Rule
+	}
+	mock.lockSaveIfAbsent.RLock()
+	calls = mock.calls.SaveIfAbsent
+	mock.lockSaveIfAbsent.RUnlock()
 	return calls
 }

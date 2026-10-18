@@ -21,13 +21,13 @@
 | cf-route-all | CF_ROUTE_ALL    | `false`        | route every request through Cloudflare Browser Rendering |
 | dbg          | DEBUG           | `false`        | debug mode                                            |
 
-#### OpenAI summaries (optional)
+#### OpenAI (optional)
 
-Setting `--openai.api-key` enables article summaries; without it no OpenAI calls are made.
+Setting `--openai.api-key` enables article summaries and selector suggestions for pages that are parsed wrong; without it no OpenAI calls are made.
 
 | Command line              | Environment               | Default      | Description                                                        |
 |---------------------------|---------------------------|--------------|--------------------------------------------------------------------|
-| openai.api-key            | OPENAI_API_KEY            | none         | OpenAI API key, enables summaries                                  |
+| openai.api-key            | OPENAI_API_KEY            | none         | OpenAI API key, enables summaries and selector suggestions         |
 | openai.model              | OPENAI_MODEL              | `gpt-6-luna` | OpenAI model                                                       |
 | openai.summary-prompt     | OPENAI_SUMMARY_PROMPT     | built-in     | custom system prompt for summaries                                 |
 | openai.max-content-length | OPENAI_MAX_CONTENT_LENGTH | `10000`      | max characters of article text sent for summarizing (0 for no limit) |
@@ -46,8 +46,11 @@ When Cloudflare credentials are not set, the service uses a standard HTTP client
     GET /api/content/v1/parser?token=secret&url=http://aa.com/blah - extract content (emulate Readability API parse call)
     GET /api/content/v1/parser?token=secret&url=http://aa.com/blah&summary=true - extract content with AI-generated summary
     POST /api/extract {url: http://aa.com/blah}  - extract content
+    POST /api/content-parsed-wrong?url=http://aa.com/blah - ask OpenAI for a rule for a page that is parsed wrong (credentials required)
 
 Summary generation requires the server token to be set and an OpenAI API key. Summaries are cached in MongoDB for 30 days, keyed by model, prompt and article text; a TTL index removes expired ones. When the key is set, rule previews in the web UI also show a summary.
+
+`POST /api/content-parsed-wrong` uses the same credentials as the rule management routes and calls OpenAI only when it is requested, never during normal extraction. The model gets an outline of the page body and suggests a CSS selector for the article. The selector is applied to the page and accepted only when it matches a plausible amount of text, not nearly the whole page and not what is extracted now; up to three suggestions are tried. The response holds the selector, the page extracted with it and `saved`. When the domain has no rule yet, the selector is stored as a **disabled** rule, so nothing changes for readers until it is reviewed and enabled in the web UI. When the domain already has a rule, enabled or not, that rule is left as it is and only the suggestion is returned.
 
 ## Development
 

@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -714,9 +715,9 @@ func TestServer_ExtractWithSummary(t *testing.T) {
 }
 
 func TestServer_SummaryBudget(t *testing.T) {
-	orig := summaryBudget
-	summaryBudget = 200 * time.Millisecond
-	t.Cleanup(func() { summaryBudget = orig })
+	orig := openAIBudget
+	openAIBudget = 200 * time.Millisecond
+	t.Cleanup(func() { openAIBudget = orig })
 
 	// a model that answers only after 2s, or gives up when its context ends
 	slowModel := func(ctx context.Context, _ openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
@@ -783,6 +784,124 @@ func TestServer_SummaryBudget(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
 		assert.Equal(t, 3, strings.Count(string(b), `class="preview-item"`))
 		assert.Empty(t, client.CreateChatCompletionCalls(), "300ms of extraction exceeds the 200ms budget, so no summary may start")
+	})
+}
+
+func TestServer_ContentParsedWrong(t *testing.T) {
+	article := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 12)
+	thread := strings.Repeat("Well, I think so, but then again, who knows, maybe not, and yet here we are, arguing about it, again. ", 6)
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintf(w, `<html><head><title>Story</title></head><body><div id="page"><ul class="menu"><li>Home</li></ul>
+<div class="copy"><p>%[1]s</p><p>%[1]s</p><p>%[1]s</p></div><div class="thread"><p>%[2]s</p><p>%[2]s</p><p>%[2]s</p><p>%[2]s</p></div></div></body></html>`,
+			article, thread)
+	}))
+	defer page.Close()
+
+	suggest := func(t *testing.T, ts *httptest.Server, query string) (status int, body string) {
+		t.Helper()
+		resp, err := post(t, ts.URL+"/api/content-parsed-wrong"+query, "")
+		require.NoError(t, err)
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		return resp.StatusCode, string(b)
+	}
+
+	t.Run("requires credentials", func(t *testing.T) {
+		ts, srv := startupT(t)
+		defer ts.Close()
+		client := &mocks.OpenAIClientMock{CreateChatCompletionFunc: summaryAnswer(`{"selector": "div.copy"}`)}
+		srv.Readability.OpenAI = client
+
+		resp, err := http.Post(ts.URL+"/api/content-parsed-wrong?url="+page.URL, "", http.NoBody)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.Empty(t, client.CreateChatCompletionCalls())
+	})
+
+	t.Run("url is required", func(t *testing.T) {
+		ts, srv := startupT(t)
+		defer ts.Close()
+		srv.Readability.OpenAI = &mocks.OpenAIClientMock{CreateChatCompletionFunc: summaryAnswer(`{"selector": "div.copy"}`)}
+		status, body := suggest(t, ts, "")
+		assert.Equal(t, http.StatusBadRequest, status, body)
+		assert.Contains(t, body, "url parameter is required")
+	})
+
+	t.Run("no OpenAI client", func(t *testing.T) {
+		ts, _ := startupT(t)
+		defer ts.Close()
+		status, body := suggest(t, ts, "?url="+page.URL)
+		assert.Equal(t, http.StatusBadRequest, status, body)
+		assert.Contains(t, body, "OpenAI key is not set")
+	})
+
+	t.Run("suggestion is returned and stored as a disabled rule", func(t *testing.T) {
+		ts, srv := startupT(t)
+		defer ts.Close()
+		srv.Readability.OpenAI = &mocks.OpenAIClientMock{CreateChatCompletionFunc: summaryAnswer(`{"selector": "div.copy"}`)}
+
+		status, body := suggest(t, ts, "?url="+page.URL)
+		require.Equal(t, http.StatusOK, status, body)
+		var res extractor.Suggestion
+		require.NoError(t, json.Unmarshal([]byte(body), &res))
+		assert.Equal(t, "div.copy", res.Selector)
+		assert.True(t, res.Saved)
+		assert.Contains(t, res.Response.Content, "The quick brown fox")
+		assert.NotContains(t, res.Response.Content, "Well, I think so")
+
+		rules := srv.Readability.Rules.All(context.Background())
+		require.Len(t, rules, 1)
+		assert.Equal(t, "div.copy", rules[0].Content)
+		assert.False(t, rules[0].Enabled)
+		_, found := srv.Readability.Rules.Get(context.Background(), page.URL)
+		assert.False(t, found, "readers must not get the rule before it is enabled")
+	})
+
+	t.Run("no usable selector", func(t *testing.T) {
+		ts, srv := startupT(t)
+		defer ts.Close()
+		srv.Readability.OpenAI = &mocks.OpenAIClientMock{CreateChatCompletionFunc: summaryAnswer(`{"selector": "div.nothing"}`)}
+		status, body := suggest(t, ts, "?url="+page.URL)
+		assert.Equal(t, http.StatusUnprocessableEntity, status, body)
+		assert.Empty(t, srv.Readability.Rules.All(context.Background()))
+	})
+
+	t.Run("model error", func(t *testing.T) {
+		ts, srv := startupT(t)
+		defer ts.Close()
+		srv.Readability.OpenAI = &mocks.OpenAIClientMock{CreateChatCompletionFunc: func(context.Context, openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			return openai.ChatCompletionResponse{}, errors.New("401 unauthorized")
+		}}
+		status, body := suggest(t, ts, "?url="+page.URL)
+		assert.Equal(t, http.StatusInternalServerError, status, body)
+		assert.Contains(t, body, "can't suggest a rule")
+	})
+
+	t.Run("gives up when the budget runs out", func(t *testing.T) {
+		orig := openAIBudget
+		openAIBudget = 200 * time.Millisecond
+		t.Cleanup(func() { openAIBudget = orig })
+
+		ts, srv := startupT(t)
+		defer ts.Close()
+		client := &mocks.OpenAIClientMock{CreateChatCompletionFunc: func(ctx context.Context, _ openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+			select {
+			case <-ctx.Done():
+				return openai.ChatCompletionResponse{}, ctx.Err()
+			case <-time.After(2 * time.Second):
+				return summaryAnswer(`{"selector": "div.copy"}`)(ctx, openai.ChatCompletionRequest{})
+			}
+		}}
+		srv.Readability.OpenAI = client
+
+		st := time.Now()
+		status, body := suggest(t, ts, "?url="+page.URL)
+		assert.Less(t, time.Since(st), time.Second)
+		assert.Equal(t, http.StatusInternalServerError, status, body)
+		assert.Len(t, client.CreateChatCompletionCalls(), 1, "no further attempts once the budget is gone")
+		assert.Empty(t, srv.Readability.Rules.All(context.Background()))
 	})
 }
 
@@ -896,6 +1015,18 @@ func newRulesStoreMock() *mocks.RulesMock {
 			}
 			rules = append(rules, rule)
 			return rule, nil
+		},
+		SaveIfAbsentFunc: func(_ context.Context, rule datastore.Rule) (bool, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			for _, r := range rules {
+				if r.Domain == rule.Domain {
+					return false, nil
+				}
+			}
+			rule.ID = bson.NewObjectID()
+			rules = append(rules, rule)
+			return true, nil
 		},
 		DisableFunc: func(_ context.Context, id bson.ObjectID) error {
 			mu.Lock()

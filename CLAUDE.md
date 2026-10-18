@@ -39,9 +39,10 @@ web/           → Go HTML templates (HTMX v2), static assets
 **Key interfaces:**
 - `extractor.Rules` (defined consumer-side in `extractor/readability.go`), implemented by `datastore.RulesDAO`. Mock generated with `//go:generate moq` in extractor package.
 - `extractor.Retriever` (defined in `extractor/retriever.go`) — abstracts URL content fetching. Two implementations: `HTTPRetriever` (default, standard HTTP GET with Safari user-agent) and `CloudflareRetriever` (Cloudflare Browser Rendering API for JS-rendered pages). When `UReadability.Retriever` is nil, defaults to `HTTPRetriever`.
-- `extractor.OpenAIClient` and `extractor.Summaries` (defined in `extractor/summary.go`): the go-openai client and the summary cache (`datastore.SummariesDAO`, TTL index on `expires_at`). `UReadability.OpenAI` is set only when `--openai.api-key` is given; nil means summaries are off. Mocks in `extractor/mocks/`; moq cannot read Go 1.27 export data, so regenerate them with a newer moq or edit by hand.
+- `extractor.SuggestRule` (`extractor/improve.go`) backs `POST /api/content-parsed-wrong`: the model suggests a selector from a page outline (`extractor/outline.go`), the selector is checked against the page, and it is stored as a disabled rule when the domain has none. It never runs during normal extraction.
+- `extractor.OpenAIClient` and `extractor.Summaries` (defined in `extractor/summary.go`): the go-openai client and the summary cache (`datastore.SummariesDAO`, TTL index on `expires_at`). `UReadability.OpenAI` is set only when `--openai.api-key` is given; nil means OpenAI features (summaries, `SuggestRule`) are off. Mocks in `extractor/mocks/`; moq cannot read Go 1.27 export data, so regenerate them with a newer moq or edit by hand.
 
-Optional OpenAI flags, all in the `--openai.*` group: `api-key` / `OPENAI_API_KEY` (enables summaries), `model` / `OPENAI_MODEL` (default `gpt-6-luna`), `summary-prompt`, `max-content-length` (characters, default 10000).
+Optional OpenAI flags, all in the `--openai.*` group: `api-key` / `OPENAI_API_KEY` (enables summaries and selector suggestions), `model` / `OPENAI_MODEL` (default `gpt-6-luna`), `summary-prompt`, `max-content-length` (characters, default 10000).
 
 ## Content Extraction Flow
 

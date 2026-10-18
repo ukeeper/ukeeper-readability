@@ -97,8 +97,8 @@ func (f *UReadability) GenerateSummary(ctx context.Context, content string) (str
 func summaryID(model, prompt, content string) string {
 	h := sha256.New()
 	for _, s := range []string{model, prompt, content} {
-		h.Write([]byte(s))
-		h.Write([]byte{0})
+		_, _ = h.Write([]byte(s))
+		_, _ = h.Write([]byte{0})
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
