@@ -26,6 +26,7 @@ type Rules interface {
 	Get(ctx context.Context, rURL string) (datastore.Rule, bool)
 	GetByID(ctx context.Context, id bson.ObjectID) (datastore.Rule, bool)
 	Save(ctx context.Context, rule datastore.Rule) (datastore.Rule, error)
+	SaveIfAbsent(ctx context.Context, rule datastore.Rule) (bool, error)
 	Disable(ctx context.Context, id bson.ObjectID) error
 	All(ctx context.Context) []datastore.Rule
 }
@@ -115,10 +116,9 @@ func (f *UReadability) ExtractByRule(ctx context.Context, reqURL string, rule *d
 	return f.extractWithRules(ctx, reqURL, rule)
 }
 
-// ExtractWithRules is the core function that handles extraction with or without a specific rule
+// extractWithRules is the core function that handles extraction with or without a specific rule
 func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule *datastore.Rule) (*Response, error) {
 	log.Printf("[INFO] extract %s", reqURL)
-	rb := &Response{}
 
 	// look up a rule by domain once up front (unless one was explicitly passed) so retriever
 	// selection and getContent share the same lookup instead of paying for two round-trips.
@@ -128,15 +128,27 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 		}
 	}
 
-	result, err := f.pickRetriever(rule).Retrieve(ctx, reqURL)
+	rb, body, err := f.fetch(ctx, reqURL, rule)
 	if err != nil {
 		return nil, err
 	}
+	return f.parse(ctx, reqURL, body, rb, rule)
+}
 
-	rb.URL = result.URL
-
-	var body string
+// fetch retrieves the page and converts it to utf8, returning a Response with the final URL, content type and charset set
+func (f *UReadability) fetch(ctx context.Context, reqURL string, rule *datastore.Rule) (rb *Response, body string, err error) {
+	result, err := f.pickRetriever(rule).Retrieve(ctx, reqURL)
+	if err != nil {
+		return nil, "", err
+	}
+	rb = &Response{URL: result.URL}
 	rb.ContentType, rb.Charset, body = f.toUtf8(result.Body, result.Header)
+	return rb, body, nil
+}
+
+// parse extracts the article from the fetched body into rb, using the rule when it is given
+func (f *UReadability) parse(ctx context.Context, reqURL, body string, rb *Response, rule *datastore.Rule) (*Response, error) {
+	var err error
 	rb.Content, rb.Rich, err = f.getContent(ctx, body, reqURL, rule)
 	if err != nil {
 		log.Printf("[WARN] failed to parse %s, error=%v", reqURL, err)
@@ -173,6 +185,21 @@ func (f *UReadability) extractWithRules(ctx context.Context, reqURL string, rule
 	return rb, nil
 }
 
+// extractWithSelector returns the inner HTML of every element matching the selector, concatenated
+func extractWithSelector(body, selector string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	var res string
+	doc.Find(selector).Each(func(_ int, s *goquery.Selection) {
+		if html, err := s.Html(); err == nil {
+			res += html
+		}
+	})
+	return res, nil
+}
+
 // getContent retrieves content from raw body string, both content (text only) and rich (with html tags).
 // if rule is provided, it tries the custom rule first and falls back to the general parser on failure.
 // rule lookup for a given URL is done upstream in extractWithRules.
@@ -190,16 +217,10 @@ func (f *UReadability) getContent(_ context.Context, body, reqURL string, rule *
 	// custom rules parser
 	customParser := func(body, reqURL string, rule datastore.Rule) (content, rich string, err error) {
 		log.Printf("[DEBUG] custom extractor for %s", reqURL)
-		dbody, err := goquery.NewDocumentFromReader(strings.NewReader(body))
+		res, err := extractWithSelector(body, rule.Content)
 		if err != nil {
 			return "", "", err
 		}
-		var res string
-		dbody.Find(rule.Content).Each(func(_ int, s *goquery.Selection) {
-			if html, err := s.Html(); err == nil {
-				res += html
-			}
-		})
 		if res == "" {
 			return "", "", fmt.Errorf("nothing extracted from %s, rule=%v", reqURL, rule)
 		}
