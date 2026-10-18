@@ -18,6 +18,7 @@ const (
 	fieldID        = "_id"
 	fieldExpiresAt = "expires_at"
 	opSet          = "$set"
+	opSetOnInsert  = "$setOnInsert"
 )
 
 // RulesDAO data-access obj for custom parsing rules, implements Rules
@@ -77,17 +78,7 @@ func (r RulesDAO) GetByID(ctx context.Context, id bson.ObjectID) (Rule, bool) {
 
 // Save upsert rule
 func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
-	// normalise nil slices to empty ones so cleared multi-value fields are stored as BSON arrays
-	// ([]) rather than null (the driver encodes nil slices as null), keeping the stored type stable.
-	if rule.MatchURLs == nil {
-		rule.MatchURLs = []string{}
-	}
-	if rule.Excludes == nil {
-		rule.Excludes = []string{}
-	}
-	if rule.TestURLs == nil {
-		rule.TestURLs = []string{}
-	}
+	rule = withEmptySlices(rule)
 	ch, err := r.UpdateOne(ctx, bson.M{fieldDomain: rule.Domain}, bson.M{opSet: rule}, options.UpdateOne().SetUpsert(true))
 	if err != nil {
 		log.Printf("[WARN] failed to save, error=%v, article=%v", err, rule)
@@ -107,6 +98,33 @@ func (r RulesDAO) Save(ctx context.Context, rule Rule) (Rule, error) {
 		}
 	}
 	return rule, err
+}
+
+// SaveIfAbsent stores the rule only when the domain has no rule yet, enabled or not, and reports
+// whether it did. An existing rule is never touched, unlike Save which replaces it.
+func (r RulesDAO) SaveIfAbsent(ctx context.Context, rule Rule) (bool, error) {
+	rule = withEmptySlices(rule)
+	ch, err := r.UpdateOne(ctx, bson.M{fieldDomain: rule.Domain}, bson.M{opSetOnInsert: rule}, options.UpdateOne().SetUpsert(true))
+	if err != nil {
+		log.Printf("[WARN] failed to save, error=%v, article=%v", err, rule)
+		return false, err
+	}
+	return ch.UpsertedID != nil, nil
+}
+
+// withEmptySlices normalises nil slices to empty ones so cleared multi-value fields are stored as BSON
+// arrays ([]) rather than null (the driver encodes nil slices as null), keeping the stored type stable.
+func withEmptySlices(rule Rule) Rule {
+	if rule.MatchURLs == nil {
+		rule.MatchURLs = []string{}
+	}
+	if rule.Excludes == nil {
+		rule.Excludes = []string{}
+	}
+	if rule.TestURLs == nil {
+		rule.TestURLs = []string{}
+	}
+	return rule
 }
 
 // Disable marks enabled=false, by id

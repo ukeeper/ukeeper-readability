@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"context"
+	"fmt"
 	"math/rand/v2"
 	"testing"
 
@@ -90,6 +91,48 @@ func TestRulesSave(t *testing.T) {
 		_, err := rules.Save(ctx, rule)
 		require.Error(t, err)
 	})
+}
+
+func TestRulesSaveIfAbsent(t *testing.T) {
+	rules := setupRules(t)
+	ctx := context.Background()
+
+	t.Run("new domain is stored", func(t *testing.T) {
+		rule := Rule{Domain: randDomain(), Content: "div.copy", User: "openai", TestURLs: []string{"https://example.com/a"}}
+		saved, err := rules.SaveIfAbsent(ctx, rule)
+		require.NoError(t, err)
+		assert.True(t, saved)
+
+		var stored Rule
+		require.NoError(t, rules.FindOne(ctx, bson.M{fieldDomain: rule.Domain}).Decode(&stored))
+		assert.Equal(t, "div.copy", stored.Content)
+		assert.Equal(t, "openai", stored.User)
+		assert.False(t, stored.Enabled)
+		assert.Equal(t, []string{"https://example.com/a"}, stored.TestURLs)
+		assert.Equal(t, []string{}, stored.MatchURLs, "nil slices are stored as arrays")
+	})
+
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("existing rule is kept, enabled=%v", enabled), func(t *testing.T) {
+			domain := randDomain()
+			orig, err := rules.Save(ctx, Rule{Domain: domain, Content: "original", Author: "me", Enabled: enabled})
+			require.NoError(t, err)
+
+			saved, err := rules.SaveIfAbsent(ctx, Rule{Domain: domain, Content: "suggested", User: "openai"})
+			require.NoError(t, err)
+			assert.False(t, saved)
+
+			var stored []Rule
+			cursor, err := rules.Find(ctx, bson.M{fieldDomain: domain})
+			require.NoError(t, err)
+			require.NoError(t, cursor.All(ctx, &stored))
+			require.Len(t, stored, 1)
+			assert.Equal(t, orig.ID, stored[0].ID)
+			assert.Equal(t, "original", stored[0].Content)
+			assert.Equal(t, "me", stored[0].Author)
+			assert.Equal(t, enabled, stored[0].Enabled)
+		})
+	}
 }
 
 func TestRulesGet(t *testing.T) {
