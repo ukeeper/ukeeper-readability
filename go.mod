@@ -14,7 +14,7 @@ require (
 	github.com/sashabaranov/go-openai v1.43.0
 	github.com/stretchr/testify v1.12.1
 	go.mongodb.org/mongo-driver/v2 v2.9.2
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 )
 
 require (
