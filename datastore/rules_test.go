@@ -6,7 +6,6 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/go-pkgz/testutils/containers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -284,10 +283,7 @@ func TestRuleString(t *testing.T) {
 
 func setupRules(t *testing.T) RulesDAO {
 	t.Helper()
-	mc := containers.NewMongoTestContainer(context.Background(), t, 5)
-	t.Cleanup(func() { mc.Close(context.Background()) }) //nolint:errcheck
-
-	server, err := New(mc.URI, "test_ureadability", 0)
+	server, err := New(mongoURI, testDBName(), 0)
 	require.NoError(t, err)
 	stores := server.GetStores()
 	return stores.Rules

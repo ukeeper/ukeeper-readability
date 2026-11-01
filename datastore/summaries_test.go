@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-pkgz/testutils/containers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -68,10 +67,7 @@ func TestSummariesTTLIndex(t *testing.T) {
 
 func setupStores(t *testing.T) Stores {
 	t.Helper()
-	mc := containers.NewMongoTestContainer(context.Background(), t, 5)
-	t.Cleanup(func() { mc.Close(context.Background()) }) //nolint:errcheck
-
-	server, err := New(mc.URI, "test_ureadability", 0)
+	server, err := New(mongoURI, testDBName(), 0)
 	require.NoError(t, err)
 	return server.GetStores()
 }
