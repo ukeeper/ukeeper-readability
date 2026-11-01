@@ -2,6 +2,9 @@ package datastore
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,12 +13,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
-	mc := containers.NewMongoTestContainer(context.Background(), t, 5)
-	defer mc.Close(context.Background()) //nolint:errcheck
+var (
+	mongoURI string // the one MongoDB container shared by all tests of the package
+	dbSeq    atomic.Int64
+)
 
+// TestMain starts a single MongoDB container for the whole package. A container per test made the
+// package take 20-30s on a healthy runner and went over the 60s limit on a slow one.
+func TestMain(m *testing.M) {
+	os.Exit(runTests(m))
+}
+
+func runTests(m *testing.M) int {
+	mc, err := containers.NewMongoTestContainerE(context.Background(), 5)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "can't start mongo container: %v\n", err)
+		return 1
+	}
+	defer mc.Close(context.Background()) //nolint:errcheck
+	mongoURI = mc.URI
+	return m.Run()
+}
+
+// testDBName returns a database name no other test uses, so tests sharing the container stay isolated
+func testDBName() string {
+	return fmt.Sprintf("test_ureadability_%d", dbSeq.Add(1))
+}
+
+func TestNew(t *testing.T) {
 	t.Run("valid connection", func(t *testing.T) {
-		server, err := New(mc.URI, "test_ureadability", 0)
+		server, err := New(mongoURI, "test_ureadability", 0)
 		require.NoError(t, err)
 		assert.NotNil(t, server)
 		assert.NotNil(t, server.client)
@@ -23,7 +50,7 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("with delay", func(t *testing.T) {
-		server, err := New(mc.URI, "test_ureadability", 10*time.Millisecond)
+		server, err := New(mongoURI, "test_ureadability", 10*time.Millisecond)
 		require.NoError(t, err)
 		assert.NotNil(t, server)
 	})
@@ -42,10 +69,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestGetStores(t *testing.T) {
-	mc := containers.NewMongoTestContainer(context.Background(), t, 5)
-	defer mc.Close(context.Background()) //nolint:errcheck
-
-	server, err := New(mc.URI, "test_ureadability", 0)
+	server, err := New(mongoURI, testDBName(), 0)
 	require.NoError(t, err)
 
 	stores := server.GetStores()
